@@ -1,0 +1,1366 @@
+---
+title: "Long-term site fidelity and environmental drivers of (Bathytoshia brevicaudata) occurrence at a provisioned aggregation site in South Africa: evidence from decade-scale sightings data and photographic identification. (version 2)"
+author: "RGA Watson and AJ Webber"
+format: 
+  docx
+  #pdf:
+  # fig-pos: "H"
+header-includes:
+  - \usepackage{lineno}
+  - \linenumbers
+execute:
+  echo: false
+  warning: false
+  message: false
+  error: false
+fig-format: pdf
+knitr:
+  opts_chunk:
+    fig.path: Manuscript_Figures/
+bibliography: STSR_ID_biblio.bib
+---
+
+
+```{r load_packages, message=FALSE, warning=FALSE, echo=FALSE}
+
+library(tidyverse)
+library(readxl)
+library(vegan)
+library(data.table)
+library(knitr)
+library(kableExtra)
+library(mgcv)
+library(ggpubr)
+library(car)
+library(emmeans)
+library(multcompView)
+library(janitor)
+
+theme_set(theme_classic())
+
+options(scipen=999)
+
+```
+
+```{r load_data , message=FALSE, warning=FALSE, error=FALSE, echo=FALSE}
+
+
+STSR_sightings <- read_excel("RAW Data/STSR SF Master 2014-2024_LocDepth.xlsm",
+                             sheet="Cage sightings")
+STSR_sightings["Date"] <- as.Date(paste(STSR_sightings$Day, 
+                                        STSR_sightings$Month,
+                                        STSR_sightings$Year,
+                                        sep="-"),
+                                  format="%d-%m-%Y")
+
+
+STSR_sightings$STSR[is.na(STSR_sightings$STSR)] <- 0
+STSR_sightings <- STSR_sightings %>%
+  dplyr::rename(SST = `Sea Surface temp`) %>%
+  mutate(SST = as.numeric(SST)) %>%
+  filter(Date >= "2014-01-01") %>%
+  drop_na(Location)
+  
+GB_Locations <- data.frame(
+  OLD_Loc = unique(as.factor(STSR_sightings$Location)), 
+  NEW_Loc = c("Joubertsdam", "Dyer Island", "Dyer Island", "Dyer Island", "Dyer Island", "Dyer Island", 
+              "Dyer Island", "Dyer Island", "Dyer Island", "Dyer Island", "Dyer Island", 
+              "Dyer Island", "Dyer Island", "Dyer Island", "Dyer Island" )
+)
+STSR_sightings["New_Loc"] <- GB_Locations[match(STSR_sightings$Location, GB_Locations$OLD_Loc), "NEW_Loc"]
+
+STSR_sightings <- STSR_sightings %>%
+  filter(New_Loc == "Joubertsdam")
+
+
+Loc_col <- c(
+  "Dyer Island" = "red", 
+  "Joubertsdam" = "blue")
+
+## Location Descriptions
+n_trips <- nrow(STSR_sightings)
+n_days <- length(unique(STSR_sightings$Date))
+n_trips_DI <- STSR_sightings %>%
+  filter(New_Loc == "Dyer Island") %>%
+  nrow()
+n_trips_JD <- STSR_sightings %>%
+  filter(New_Loc == "Joubertsdam") %>%
+  nrow()
+# n_trips_NA <- STSR_sightings %>%
+#   filter(New_Loc != "Joubertsdam" & New_Loc != "Dyer Island") %>%
+#   nrow()
+
+mn_depth <- round(mean(STSR_sightings$Depth, na.rm=T),2)
+min_depth <- round(min(STSR_sightings$Depth, na.rm=T),2)  
+max_depth <- round(max(STSR_sightings$Depth, na.rm=T),2)
+sd_depth <- round(sd(STSR_sightings$Depth, na.rm=T),2)
+
+mn_SST <- round(mean(STSR_sightings$SST, na.rm=T),2)
+min_SST <- round(min(STSR_sightings$SST, na.rm=T),2)  
+max_SST <- round(max(STSR_sightings$SST, na.rm=T),2)
+sd_SST <- round(sd(STSR_sightings$SST, na.rm=T),2)
+
+STSR_CummSum <- STSR_sightings
+STSR_CummSum$STSR[is.na(STSR_CummSum$STSR)] <- 0
+STSR_CummSum <- STSR_CummSum[order(STSR_CummSum$Date),]
+STSR_CummSum["STSR_CummSum"] <- cumsum(STSR_CummSum$STSR)
+
+
+STSR_ID_data_raw <- read_excel("RAW Data/STSR SF Master 2014-2024_LocDepth.xlsm",
+                           sheet="STSR sightings")
+STSR_ID_data <- STSR_ID_data_raw %>%
+  mutate(Date = as.Date(paste(Day, Month, Year, sep="-"), format="%d-%m-%Y")) %>%
+  dplyr::rename(STSR_ID = `STSR ID 1`) %>%
+  mutate(STSR_ID = as.factor(STSR_ID)) %>%
+  mutate(SST = as.numeric(SST)) %>%
+  mutate(Year = year(Date)) %>%
+  mutate(Month = month(Date)) %>%
+  mutate(Season = ifelse(Month %in% c(1:3, 10:12), "Summer", "Winter")) %>%
+  mutate(STSR_ID = str_replace_all(STSR_ID, "000", "00")) %>%
+  mutate(STSR_ID = str_replace_all(STSR_ID, "0010", "010")) %>%
+  mutate(STSR_ID = str_replace_all(STSR_ID, "0011", "011"))
+
+```
+
+
+## Abstract
+
+#### Background
+Large coastal elasmobranchs face disproportionate extinction risk yet remain among the most data-deficient marine vertebrates globally. Photo-identification has emerged as a powerful non-invasive tool for studying individually recognizable species, though its application to batoids remains limited relative to sharks. The short-tail stingray is a large demersal batoid distributed anti-tropically across the Southern Hemisphere, for which site fidelity, habitat associations, and local population structure remain poorly characterized across most of its range. This study applied long-term sightings data and photographic identification to characterize occurrence patterns, individual residency, and local abundance at an aggregation site in Gansbaai, South Africa.
+
+#### Results
+Between 2014 and 2024, short-tail stingrays were recorded on 1149 of 7530 boat-based trips, yielding 1351 sightings concentrated at a single shallow inshore site. Sea surface temperature, depth, season, and time are significant predictors of occurrence. Sightings increasing above 15°C, peaking at 6–9 m depth, and displaying a bimodal seasonal pattern inconsistent with summer mating aggregations documented elsewhere. Sightings increased markedly after 2017, coinciding with documented white shark displacement from the area. Photographic identification of dorsal spot patterns cataloged eleven individuals across 398 positive identifications, with residency spanning from single visits to near-decade repeated associations. An open population mark-recapture model estimated high apparent survival (0.95), moderate detection probability (0.75), and a super-population of eleven individuals with low annual recruitment.
+
+#### Conclusions
+This study represents the first population-level assessment of short-tail stingrays in South Africa and the longest continuous observational record of the species globally. Results support the presence of a small, predominantly female, partially resident assemblage exhibiting long-term site fidelity, embedded within a broader regional population. The findings demonstrate that opportunistic platforms such as shark cage diving operations can function as cost-effective monitoring systems for coastal elasmobranchs, and validate photographic identification as a viable mark-recapture framework for batoids with naturally stable pigmentation patterns. 
+
+## Introduction 
+
+<!-- Cartilaginous fishes, belonging to the taxonomic class Chondrichthyes, are a globally distributed group of primarily marine species [@carrier2022biology]. The class consists of over 1250 species [@ebert2021sharks; @white2022taxonomy], of which over 650 species belong the batoid order [@white2022taxonomy]. Despite their circumglobal distribution and importance in trophic and ecosystem processes, basic ecological information is lacking for most species, which has led to 11.9% of 1266 species assessed being listed as Data Deficient on the IUCN Red List of Threatened Species [@IUCN2025]. None more so than with batoids, where 77 species are classified as Data Deficient, while 248 species are classified as threatened (Vulnerable, Endangered or Critically Endangered) [@IUCN2025]. -->
+
+The short-tail stingray (*Bathythosia brevicaudata*), also known as the smooth stingray, is a demersal and epi-pelagic batoid distributed anti-tropically across South Africa, Australia, New Zealand, and Japan [@last2016rays]. 
+The species can reach a maximum size of 210 cm disc width [@last2016rays] and is known to inhabit depths ranging from 0 to 200 meters [@le2008observations]. 
+The species exhibits aplacental viviparous reproduction, producing litters of 6–10 pups, with size-at-birth ranging from 32 to 36 cm disc width [@last2016rays]. 
+Seasonal aggregations, likely associated with mating and pupping, have been observed in the Poor Knights Islands Marine Reserve, New Zealand [@le2012conservation]. As well as pupping and mating aggregations, aggregations within harbours, a possible association to provisioning of fish discards from local fishermen, have been identified in Jervis Bay, Australia [@pini2018effects].
+
+In South Africa, Struisbaai, located in the Western Cape province near Cape Agulhas, offers an example of a provisioned aggregation site, while increased regular sightings at Miller's Point, Simon's Town, Cape Town, Western Cape province, provides anecdotal evidence for another aggregation site. These aggregation sites are known locally, and limited to no records are documented for these aggregation sites in the scientific literature. Historically recorded sightings in Gansbaai, Western Cape province, suggest the area is an aggregation site for short-tail stingrays as well. 
+
+Along the African coast, the short-tail stingray is found from St. Helena Bay along the west coast of South Africa [@van2016extension], to southern Mozambique [@IUCN2021]. 
+While its generation length is not listed, its congener *B. lata* is listed as 21.5 years [@IUCN2021]. 
+The species was reclassified from *Dasyatis*, and the genus name *Bathythosia* resurrected, based on re-analysis of mitochondrial DNA [@last2016revised]. 
+Analyses of the mitochondrial DNA revealed limited gene flow in the Southern Hemisphere between South Africa and elsewhere and low levels of gene flow between Australia and New Zealand [@le2012population; @roycroft2019population]. The South African short-tail stingray population likely diverged from New Zealand between 112 000 and 225 000 years ago and from the Australian population between 75 000 and 150 000 years ago, respectively [@le2012population]. Furthermore, male-mediated gene flow has been shown to be at least fivefold greater than female-mediated gene flow [@roycroft2019population]. 
+
+Large, coastal elasmobranch species are at the greatest risk of local extirpation or extinction, and suffer significantly from the combined threats of fishing and habitat degradation [@dulvy2014extinction; @dulvy2017challenges; @roycroft2019population]. Despite being classified as Least Concern on the IUCN Red List [@IUCN2021], the short-tail stingray is not without threat within South Africa, occasionally caught in recreational fisheries, and suspected to be caught (but not reported) in demersal shark longline, commercial, beach-seine and gillnet, and offshore and inshore demersal trawl fisheries [@da2015current]. As well as commercial bycatch, short-tail stingrays are targeted by recreational angling practices within South Africa, a catch and release practice that induces either mortality, injury or biochemical stress responses within elasmobranchs [@cameron2023review].
+
+Ecological knowledge surrounding the short-tail stingray is still severely lacking, none more so than in southern Africa, where the majority of what is known of the species' life history and ecology is derived from alternative global aggregations [@le2012conservation;@pini2018effects]. Existing monitoring methods include documentation through Baited Remote Underwater Video surveys (BRUVs) [@de2015baited; @osgood2020chondrichthyans; @dando2020baited; @cortelezzi2022conservation], as well as the Oceanographic Research Institute's Cooperative Fish Tagging Project (ORI-CFTP). This long-term marine citizen science project started in 1985 [@dunlop2013review; @mann2022assessment], yet only a 2.7% recapture rate of 184 tagged individuals have been documented over a 40 year period [@elston2025]. While the species is not a target species within the tagging programme, despite historical efforts, the data offers limited insight into short-tail stingray site use or migratory trends, indicating a requirement for more effective and frequent mark-recapture application. The application of photographic identification at aggregation sites is a plausible alternate method, successfully used in to collect life history and ecological data [@rowat2009population].
+
+The aim of this study was twofold: 
+(1) to characterise the temporal and seasonal occurrence patterns of short-tail stingrays at a baited surface aggregation site in Gansbaai, South Africa, and evaluate the influence of abiotic parameters on sighting frequency; and 
+(2) apply photographic identification techniques to a historical image archive to catalog individually recognizable short-tail stingrays, assess site fidelity and residency patterns, and generate preliminary estimates of local abundance using mark-recapture frameworks.
+
+
+## Methods
+
+This study was performed at an inshore shark-cage diving site near Gansbaai, Western Cape, South Africa (19°26'E, -34°39'S; @fig-map), known as Joubertsdam. This area is located approximately 120 km south-east from Cape Town, and is influenced by both the cold Benguela and warm Agulhas Currents [@veitch2017role]. The benthic habitat is primarily sand and small boulders, with several sandstone banks and temperate reefs [@lenhoff1995marine]. This area is known for its high marine biodiversity, including 
+white sharks (prior to 2017; @towner2013environmental; @towner2016sex; @towner2022fear), 
+cetaceans [@petersen2016distribution], 
+sunfish [@watson2023patterns], 
+while Dyer Island is home to various seabirds, including the Critically Endangered African penguin [@ludynia2014processes; @IUCN_peng], 
+and its neighbouring island Geyser Rock is home to a colony of Cape fur seals [@makhado2013assessment; @wcisel2015role]. 
+
+Data was collected during routine shark cage diving operations, following national permit condition regulations. After the shark cage diving vessel (SCDV) anchored, chum with fish-based products mixed with seawater were used until elasmobranchs were observed, typically operating between 07:00 and 16:00, with a maximum of three trips per day, each up to three hours in length. Location, depth and sea surface temperature (SST) data were collected on-site from the vessel's computer. 
+
+Two complementary methods were utilized for the purposes of this study: sightings records of short-tail stingrays, and individual identification of short-tail stingrays from in-field photographs.
+
+![Location of the study area with Joubertsdam (blue), in relation to Gansbaai and Kleinbaai. Inset: Location of Gansbaai within South Africa, with IUCN distribution in blue (@IUCN2021). ](Images/STSR_Loc_map_JDonly.pdf){#fig-map}
+
+
+### Stingray Sightings
+
+Sightings data were collected over the period from January 2014 to December 2024. Sightings data was standardized per month by dividing the sum of short-tail stingray sightings per month by the number of trips performed that month. The short-tail stingray relative sightings data were analyzed using a generalized linear model (GLM) with Gaussian distribution and identity link function, and tested the effects of years (2014-2024) on the relative sightings. Data were log-transformed (log(relative sightings + 0.001)) to meet assumptions of normality and homoscedasticity. 
+Post-hoc pairwise comparisons were conducted using estimated marginal means with Tukey adjustment for multiple comparisons (`emmeans` package, @lenthandpiaskowski2025) and significance was assessed at $\alpha$=0.05.
+<!-- We plotted the long-term boat-based observations of [STSR] and compared monthly means of [STSR] numbers using analysis of variance (ANOVA) with a post hoc Tukey HSD test (Tukey 1949). -->
+
+A negative-binomial Generalized Additive Model (GAM), to account for overdispersion in the count data, was created using R's `gam`-function in the `mgcv` package [@wood2018mixed] on the sightings data, using SST, depth, day of the study period (as a number), and month as predictor variables (@eq-GAM). For SST, depth and day a thin plate spline was used, with the dimension of each smooth term (k) ranging from 10 to 15. The k-value was selected to balance model complexity with biological interpretability, and effective degrees of freedom were estimated using restricted maximum likelihood (REML). For month a cyclic cubic spline was used with k=12, accounting for the cyclic nature of the data and sampling across all twelve months. Model performance was evaluated using diagnostic plots including QQ-plots of residuals, residuals vs. linear predictor, histogram of residuals, and residuals vs. fitted values, using the `gam.check` function, and k compared to `k.check`'s k-value. 
+
+$$
+\begin{aligned}
+\text{STSR} &\text{~} s(\text{SST}, bs="tp", k=15) \\
+  &+ s(\text{Depth}, bs="tp", k=12) \\
+  &+ s(\text{Time}, bs="tp", k=10)  \\
+  &+ s(\text{Month}, bs="cc", k=12) 
+\end{aligned}
+$$ {#eq-GAM}
+
+
+### Photographic Identification
+
+Photographic identification which relies on unique natural pigmentation patterns, scars, or other distinct features, has emerged as a vital, relatively inexpensive, and non-invasive method for studying batoids and other elasmobranchs [@brooks2010seeing; @marshall2012use; @flowers2017site]. Photographic identification has shown to offer a valid alternative to conventional tagging, as long as its assumptions and practical constraints are met, and in some cases improving the results of mark–recapture studies [@rowat2009population; @marshall2012use]. Initial photographic identification studies on stingrays began in the Bahamas with species possessing intricate dorsal markings, such as the whitespotted eagle ray (*Aetobatus narinari*), establishing essential photographic requirements [@corcoran1999use]. Photographic identification has been successfully validated for rays, such as the blue-spotted ribbontail ray (*Taeniura lymma*) or smalleye stingray (*Megatrygon microps*), demonstrating stability of dorsal spot patterns over periods of at least 496 days [@boggio2019spotting] to six years [@mcivor2024mark], respectively, and enabling population assessment where conventional tagging is difficult [@keeping2020computer]. 
+
+During routine operations, photos of wildlife were taken from the SCDV. These included short-tail stingrays as they approached the vessel. Spot patterns were identified on the dorsal side of the body, behind the spiracles (@fig-SpotComp). These spots varied in number and composition, and appeared to be individual-specific. The relative sighting for each individual was calculated by dividing the number of observations per month by the number of days within that month, and then averaged over all months of the study period. Photos of individuals captured at the start and end of the study period were compared to determine whether there were any significant changes in number of spots and composition. An abacus plot of sightings across the time period and across months were created to visually examine individual patterns in sightings. An accumulation curve was constructed using R's `specaccumm`-function in the `vegan` package to determine whether survey effort adequately captured the observable population, whether identification effort approached asymptotic population coverage, and to provide complementary context for interpretation of population estimates.
+<!-- , while Chao and Bootstrap extrapolation were calculated to [estimate the total observable population size - FIX SENTENCE] using the `specpool`-function from the same package.  -->
+
+
+![Location of distinguishing spots of short-tail stingrays and comparisons using individuals 1 and 6. Stingray outline redrawn from Last et al., 2016.](Images/Spot_comparison/STSR_Spot_Comparison.png){#fig-SpotComp}
+
+The local short-tail stingray population size over the course of the study period was estimated using a POPAN formulation of the Jolly-Seber open population model implemented in MARK via the RMark package in R [@RMark2013]. Encounter histories were constructed from individual capture records, with each year representing a sampling occasion. Eight candidate models with different combinations of temporal variation (constant and time-varying) in apparent survival (Φ), detection probability (p), and entry probability (pent) were evaluated, while super-population size (N) remained constant. Model selection was conducted using Akaike's Information Criterion corrected for small sample size (AICc). The best-supported model (constant Φ, constant p, and constant pent) was used to estimate annual detection probabilities, from which annual population size estimates were derived by dividing the number of observed individuals by the estimated detection probability for each year. Uncertainty around population estimates was quantified using a non-parametric bootstrap procedure with 100 iterations, resampling capture histories with replacement and refitting the selected model structure. 95% confidence intervals were calculated from the 2.5th and 97.5th percentiles of the bootstrap distribution. This approach accounts for uncertainty in detection probability while providing robust estimates of population size for this naturally marked population over the study period [@buckland1991quantifying].
+
+
+## Results
+
+```{r, results='hide'}
+
+trip_sum <- aggregate(Date ~ Year + Month, STSR_sightings, length)
+trip_sumSum <- aggregate(Date ~ Month, trip_sum, function(x) c(mn=mean(x), sd=sd(x)))
+trip_sumSum <- do.call("data.frame", trip_sumSum)
+
+trip_sum_w <- trip_sum %>%
+  mutate(Month = month.abb[Month]) %>%
+  pivot_wider(names_from="Month", values_from = "Date") %>%
+  mutate(Total = rowSums(across(Jan:Dec), na.rm=T)) %>%
+  adorn_totals("row")
+
+summary(lm(STSR ~ as.numeric(Date), STSR_sightings))
+
+STSR_Dep_loc <- STSR_sightings %>%
+  filter(Date >= "2014-01-01") %>%
+  select(Date, New_Loc, Depth) %>%
+  mutate(Year = year(Date)) %>%
+  mutate(Month = month(Date))
+
+STSR_Dep_loc_agg <- aggregate(Depth ~ Date + New_Loc, STSR_Dep_loc, mean)
+
+#shapiro.test(lSTSR_Dep_loc_agg$Depth)
+#summary(glm(Depth ~ New_Loc, STSR_Dep_loc_agg, family=gaussian))
+
+# ggplot(STSR_Dep_loc_agg, aes(x=New_Loc, y=Depth, group=New_Loc)) +
+#   geom_boxplot()
+#aggregate(Depth ~ New_Loc, STSR_Dep_loc, function(x) c(mn = mean(x), sd=sd(x)))
+
+#STSR_wilcox_depth <- wilcox.test(Depth ~ New_Loc, STSR_Dep_loc_agg)
+
+
+
+
+# STSR_SST_loc <- STSR_sightings %>%
+#     filter(Date >= "2014-01-01") %>%
+#   mutate(SST = as.numeric(SST)) %>%
+#   filter(SST > 9) %>%
+#   select(Date,New_Loc, SST) %>%
+#   mutate(Year = year(Date)) %>%
+#   mutate(Month = month(Date))
+# STSR_SST_loc_agg <- aggregate(SST ~ Date + New_Loc, STSR_SST_loc, mean)
+# 
+# 
+# shapiro.test(STSR_SST_loc_agg$SST)
+# STSR_wilcox_SST <- wilcox.test(SST ~ New_Loc, STSR_SST_loc_agg)
+
+```
+
+
+Between January 2014 and December 2024, a total of `r n_trips` trips to Joubertsdam were performed across `r n_days` days. Across the year, June and July were the months with on average the lowest number of trips 
+(`r round(trip_sumSum[trip_sumSum$Month == 6, "Date.mn"],1)` ± `r round(trip_sumSum[trip_sumSum$Month == 6, "Date.sd"],1)` and 
+`r round(trip_sumSum[trip_sumSum$Month == 7, "Date.mn"],1)` ± `r round(trip_sumSum[trip_sumSum$Month == 7, "Date.sd"],1)` trips/month, mean±sd, respectively), while October, November and December showed on average the highest number of trips (`r round(trip_sumSum[trip_sumSum$Month == 10, "Date.mn"],1)` ± `r round(trip_sumSum[trip_sumSum$Month == 10, "Date.sd"],1)`, 
+`r round(trip_sumSum[trip_sumSum$Month == 11, "Date.mn"],1)` ± `r round(trip_sumSum[trip_sumSum$Month == 11, "Date.sd"],1)` and 
+`r round(trip_sumSum[trip_sumSum$Month == 12, "Date.mn"],1)` ± `r round(trip_sumSum[trip_sumSum$Month == 12, "Date.sd"],1)` trips/month, respectively; @tbl-trp_summ).
+Depth ranged from `r min_depth` m to `r max_depth` m, `r mn_depth` ± `r sd_depth` m (mean ± sd), while SST ranged from `r min_SST`°C to `r max_SST`°C (`r mn_SST`±`r sd_SST`°C). 
+
+
+```{r STSR_SST}
+
+STSR_SST <- STSR_sightings %>%
+  mutate(SST = as.numeric(SST)) %>%
+  filter(SST > 9) %>%
+  select(Date, SST) %>%
+  mutate(Year = year(Date)) %>%
+  mutate(Month = month(Date))
+
+trip_sst_coeff = mean(STSR_SST$SST) / mean(trip_sum$Date)
+
+trip_plot <- ggplot(trip_sumSum) + 
+  geom_point(aes(x=Month, y=Date.mn)) +
+  geom_errorbar(aes(x=Month, ymin=Date.mn-Date.sd, ymax=Date.mn+Date.sd), width=0.3) + 
+  #stat_summary(data = trip_sum, aes(x=Month, y=Date), geom = "pointrange") + 
+  # stat_summary(data= STSR_SST, aes(x=Month, y=SST / trip_sst_coeff), colour="blue", geom = "pointrange") +
+  scale_x_continuous(n.breaks=12) + 
+  scale_y_continuous(limits = c(0,80)) + 
+  # scale_y_continuous(
+  #   # Features of the first axis
+  #   name = "Trips",
+  #   # Add a second axis and specify its features
+  #   sec.axis = sec_axis(~.*trip_sst_coeff, name="SST")
+  # ) 
+  labs(y="Trips")
+
+STSR_SST_agg <- aggregate(SST ~ Month + Year, STSR_SST, function(x) c(mn = mean(x), sd=sd(x)))
+STSR_SST_agg <- do.call("data.frame", STSR_SST_agg)
+STSR_SST_agg <- STSR_SST_agg %>%
+  mutate(Date = as.Date(paste("01", Month, Year, sep="-"), format="%d-%m-%Y")) %>%
+  mutate(Year = as.factor(Year))
+
+# STSR_SST_agg %>% 
+#   ggplot(aes(x=Date)) +
+#   geom_point(aes(y=SST.mn)) + 
+#   geom_line(aes(y=SST.mn)) + 
+#   geom_ribbon(aes(ymin = SST.mn-SST.sd, 
+#                     ymax = SST.mn+SST.sd), 
+#               alpha=0.3)
+
+# STSR_SST_agg %>%
+#   ggplot(aes(x=Month, y=SST.mn, colour=as.factor(Year), group=as.factor(Year))) + 
+#   geom_line()+ 
+#   geom_point()
+
+STSR_SST$Year <- as.factor(STSR_SST$Year)
+STSR_SST$Year <- factor(STSR_SST$Year , 
+                   levels=levels(STSR_SST$Year)[order(levels(STSR_SST$Year), decreasing = TRUE)])
+
+SST_plot <- STSR_SST %>%
+  ggplot(aes(x=SST, group=Year, fill=Year)) +
+  geom_histogram(binwidth=1) +
+  scale_fill_brewer(palette = "RdYlGn") + 
+  labs(x="SST", 
+       y="Frequency")
+
+STSR_Dep <- STSR_sightings %>%
+  filter(Date >= "2014-01-01") %>%
+  select(Date, Depth) %>%
+  mutate(Year = year(Date)) %>%
+  mutate(Month = month(Date))
+
+STSR_Dep$Year <- as.factor(STSR_Dep$Year)
+STSR_Dep$Year <- factor(STSR_Dep$Year , 
+                   levels=levels(STSR_Dep$Year)[order(levels(STSR_Dep$Year), decreasing = TRUE)])
+
+
+Dep_plot <- STSR_Dep %>%
+  ggplot(aes(x=Depth*-1, group=Year, fill=Year)) + 
+  geom_histogram(binwidth = 1) + 
+    scale_fill_brewer(palette = "RdYlGn") + 
+  labs(x="Depth",
+       y="Frequency") + 
+  coord_flip()
+
+```
+
+```{r, fig.show='hide'}
+#| label: fig-DepSST_plot
+#| fig-height: 5
+
+#ggarrange(
+#  trip_plot, nrow=2, align="hv", labels = c("A", NA), heights = c(1,1),
+  ggarrange(Dep_plot, SST_plot, ncol=2, align = "hv", labels = c("A", "B"), 
+            common.legend = T, legend = "bottom"
+            )
+#  )
+          
+
+```
+
+### Stingray Sightings
+
+```{r}
+
+# Sightings summary 
+n_trip_wSTSR <- STSR_sightings %>%
+  filter(STSR > 0 ) %>%
+  select(STSR) %>%
+  nrow()
+n_STSR <- STSR_sightings %>%
+  filter(STSR > 0 ) %>%
+  select(STSR) %>%
+  sum(na.rm=T)
+n_STSR_DI <- STSR_sightings %>%
+  filter(STSR > 0 ) %>%
+  filter(New_Loc == "Dyer Island") %>%
+  select(STSR) %>%
+  sum(na.rm=T)
+# 
+# n_STSR_JD <- STSR_sightings %>%
+#   filter(STSR > 0 ) %>%
+#   filter(New_Loc == "Joubertsdam") %>%
+#   select(STSR) %>%
+#   sum(na.rm=T)
+
+
+
+```
+
+```{r , warning=FALSE, echo=FALSE, results='hide'}
+
+STSR_lm_prep <- STSR_sightings %>%
+  filter(Date > "2014-01-01")
+STSR_lm <- summary(lm(STSR ~ Date, STSR_lm_prep))
+
+
+
+```
+
+Out of `r n_trips` trips performed, short-tail stingrays were sighted on `r n_trip_wSTSR` trips (`r round((n_trip_wSTSR/n_trips)*100,2)`%). The number of short-tail stingrays sighted on these trips ranged from 1 to 3 (`r round(mean(filter(STSR_lm_prep, STSR >=1)$STSR),2)` ± `r round(sd(filter(STSR_lm_prep, STSR >=1)$STSR),2)`, mean ± sd), resulting in a total of `r n_STSR` short-tail stingray sightings. Due to a drop in trips as a result of the national COVID-19 lockdown and the resulting impact on tourism, there was a decrease in sightings of short-tail stingrays around 2020 and 2021.
+
+The location of Dyer Island was not considered in the analyses of this study due to the low number of sightings of stingrays in the area (n = `r n_STSR_DI`), and incomparable time frames of trips over the course of the study --- primarily between 2014 and 2016 (n = 105, n = 120, n = 151, respectively), lower than average number of trips to Dyer Island in 2017, 2018, 2021 and 2022 (n = 20, n = 9, n = 8, n = 1, respectively), with no trips in 2019, 2020, 2023 and 2024. 
+
+```{r}
+#| label: tbl-trp_summ
+#| tbl-cap: "Count of number of ecotourism trips to Joubertsdam between 2014 and 2024, per month, with yearly and monthly totals."
+
+
+kable(trip_sum_w)
+
+
+```
+
+
+<!-- # ```{r , warning=FALSE, echo=FALSE} -->
+<!-- # #| label: fig-CummSum_plot -->
+<!-- # #| fig-cap: "Cummulative sum of STSR sightings." -->
+<!-- #  -->
+<!-- # ggplot(STSR_CummSum, aes(x=Date, y=STSR_CummSum)) +  -->
+<!-- #   geom_line() -->
+<!-- #  -->
+<!-- # ``` -->
+
+```{r results='hide', echo=FALSE}
+
+STSR_agg_prep <- STSR_sightings %>%
+  filter(Date > "2014-01-01") %>%
+  mutate(MonYear = paste(Month, Year, sep="-")) %>%
+  mutate(Year = as.factor(Year))
+
+
+
+STSR_y_aov <- aov(STSR ~ Year ,STSR_agg_prep)
+STSR_y_Tukey <- TukeyHSD(aov(STSR ~ Year ,STSR_agg_prep))
+
+
+STSR_Tukey_let <- multcompView::multcompLetters4(STSR_y_aov, STSR_y_Tukey, reversed=T)
+STSR_Tukey_let_df <- as.data.frame(STSR_Tukey_let[[1]]$Letters)
+STSR_Tukey_let_df <- STSR_Tukey_let_df %>%
+  rename(Letters = `STSR_Tukey_let[[1]]$Letters`) %>%
+  rownames_to_column("Year") %>%
+  mutate(Year = as.numeric(Year))
+
+STSR_m_aov <- aov(STSR ~ as.factor(Month) ,STSR_agg_prep)
+STSR_m_Tukey <- TukeyHSD(aov(STSR ~ as.factor(Month) ,STSR_agg_prep))
+
+STSR_Tukey_let_m <- multcompView::multcompLetters4(STSR_m_aov, STSR_m_Tukey, reversed=T)
+STSR_Tukey_let_m_df <- as.data.frame(STSR_Tukey_let_m[[1]]$Letters)
+STSR_Tukey_let_m_df <- STSR_Tukey_let_m_df %>%
+  rename(Letters = `STSR_Tukey_let_m[[1]]$Letters`) %>%
+  rownames_to_column("Month") %>%
+  mutate(Month = as.numeric(Month))
+
+
+
+STSR_agg_my <- aggregate(STSR ~ Month + Year + New_Loc, 
+                         STSR_agg_prep, 
+                         FUN = function(x) c(sum=sum(x, na.rm=T), l=length(x)),
+                         drop=FALSE)
+STSR_agg_my <- do.call("data.frame", STSR_agg_my)
+STSR_agg_my[is.na(STSR_agg_my)] <- 0
+STSR_agg_my <- STSR_agg_my %>%
+  dplyr::rename(sum = "STSR.sum", 
+         length = "STSR.l")
+STSR_agg_my["RA"] <- STSR_agg_my$sum / STSR_agg_my$length
+
+shapiro.test(STSR_agg_my$RA)
+# STSR_RA_t <- wilcox.test(RA ~ New_Loc, STSR_agg_my)
+STSR_RA_aov_JD <- kruskal.test(RA ~ as.factor(Year), filter(STSR_agg_my, New_Loc == "Joubertsdam"))
+# STSR_RA_aov_DI <- kruskal.test(RA ~ as.factor(Year), filter(STSR_agg_my, New_Loc == "Dyer Island"))
+
+
+STSR_agg_my <- STSR_agg_my %>% 
+  mutate(across(everything(), ~replace(.x, is.nan(.x), 0)))
+
+STSR_agg_my["YearMon"] <- as.Date(paste("14", STSR_agg_my$Month, STSR_agg_my$Year, sep="-"), format="%d-%m-%Y")
+
+STSR_count_plot <- STSR_sightings %>% 
+  #filter(STSR >= 1) %>%
+  filter(Date >= "2014-01-01") %>%
+  ggplot(aes(x=Date, y=STSR)) +  #, colour=New_Loc)) + 
+  geom_point(aes(colour=New_Loc), alpha=0.3) +
+  #geom_smooth(method="lm") + 
+  scale_color_manual(values=Loc_col) + 
+  labs(colour="Location") + 
+  theme(legend.position = "bottom")
+
+STSR_RA_m_plot <- ggplot(STSR_agg_my, aes(x=Month, y=RA)) +
+    geom_boxplot(aes(group=Month)) +
+    geom_smooth(method="loess", linewidth=0.4, colour="black", se=F)+
+    #geom_text(data=STSR_Tukey_let_m_df, aes(label=Letters, x=Month, y=1.3)) + 
+  scale_x_continuous(n.breaks=12) 
+  #geom_boxplot(aes(group=YearMon)) +
+
+trip_loc_sum <- aggregate(Date ~ Year + Month + New_Loc, 
+                          STSR_sightings, 
+                          length, 
+                          drop = F,
+                          simplify=T)
+
+trip_loc_sum_y <- aggregate(Date ~ Year + New_Loc, 
+                            trip_loc_sum, 
+                            function(x) c(mn=mean(x), sd=sd(x)), 
+                            drop = F)
+trip_loc_sum_y <- do.call("data.frame", trip_loc_sum_y)
+trip_loc_sum_y[is.na(trip_loc_sum_y)] <- 0
+
+#coeff_RAy <- mean(STSR_agg_my$RA)
+
+
+# FIT MODEL
+
+RA_glm_model <- glm(log(RA + 0.001) ~  Year,
+                      data = STSR_agg_my,
+                      family = gaussian(link = "identity"))
+
+summary(STSR_agg_my$RA)
+STSR_agg_mon <- aggregate(RA ~ Year, STSR_agg_my, median)
+
+# DIAGNOSTICS
+# par(mfrow = c(2, 2))
+# plot(RA_glm_model)
+
+RA_glm_aov <- anova(RA_glm_model)
+#RA_glm_aov
+
+# emm_site <- emmeans(RA_glm_model, ~ New_Loc, type = "response")
+#emm_site  # View the means
+
+# pairs_site <- pairs(emm_site, adjust = "tukey")
+#pairs_site
+
+# pvals <- summary(pairs_site)$p.value
+# names(pvals) <- gsub(" ", "", summary(pairs_site)$contrast)
+# cld_manual <- multcompLetters(pvals, threshold = 0.05)
+
+
+# 2. PAIRWISE COMPARISONS FOR YEARS
+emm_season <- emmeans(RA_glm_model, ~ Year, type = "response")
+pairs_season <- pairs(emm_season, adjust = "tukey")
+#pairs_season
+
+pvals <- summary(pairs_season)$p.value
+# names(pvals) <- gsub(" / ", "-", summary(pairs_season)$contrast)
+names(pvals) <- gsub(" ", "", summary(pairs_season)$contrast)
+cld_manual <- multcompLetters(pvals, threshold = 0.05)
+names(cld_manual$Letters) <- seq(2014, 2024, by=1)
+cld_manual_df <- as.data.frame(cld_manual$Letters)
+cld_manual_df <- cld_manual_df %>%
+  rename(Letters = `cld_manual$Letters`) %>%
+  rownames_to_column("Year") %>%
+  left_join(STSR_agg_mon, by="Year")
+#print(cld_manual)
+
+
+# Or compare season within each site
+# emm_interaction2 <- emmeans(RA_glm_model, ~ Year | New_Loc, type = "response")
+# pairs_interaction2 <- pairs(emm_interaction2, adjust = "tukey")
+# #pairs_interaction2
+# 
+# pvals_int <- summary(pairs_interaction2)$p.value
+# original_list <- gsub(" ", "", summary(pairs_interaction2)$contrast)
+# 
+# names(pvals_int) <- original_list
+# DI_int <- pvals_int[1:55]
+# DI_int_manl <- multcompLetters(DI_int, threshold = 0.05)
+# names(DI_int_manl$Letters) <- seq(2014, 2024, by=1)
+# 
+# JD_int <- pvals_int[56:101]
+# JD_int_manl <- multcompLetters(JD_int, threshold = 0.05)
+# names(JD_int_manl$Letters) <- seq(2014, 2024, by=1)
+# 
+# DI_int_manl <- multcompLetters(pvals_int, threshold = 0.05)
+
+
+coeff_RAy <- mean(trip_loc_sum_y$Date.mn) # / 
+#coeff_RAy <- coeff_RAy * 3
+
+```
+
+Monthly relative sightings of short-tail stingrays ranged from 0 to 1.1778 (June 2022; `r round(mean(STSR_agg_my$RA),2)` ± `r round(sd(STSR_agg_my$RA),2)`, mean ± sd), with year significantly affected the relative sightings of short-tail stingrays ($F_{10,210.06}$ = `r round(RA_glm_aov$F[2],2)`, p<0.05). 
+The subsequent Tukey-HSD post-hoc testing revealed two distinct groupings in mean relative abundance across years. Years 2014 and 2020 formed a significantly lower-abundance group (group A), years 2018, 2019, and 2022–2024 a significantly higher-abundance group (group B), with years 2015–2017 and 2021 occupying an intermediate position not significantly different from either extreme (group AB; @fig-STSR_box).
+
+
+```{r  echo=FALSE}
+#| label: fig-STSR_box
+#| fig-cap: "Short-tail stingray (Bathytoshia brevicaudata) sightings per trip per month (box-and-whisker) around shark cage diving vessels (SCDV), and trips per month (dashed line and errorbars) in Gansbaai, South Africa, between 2014 and 2024."
+#| fig-height: 6
+#| fig-width: 10
+
+STSR_RA_y_plot <- STSR_agg_my %>%
+  mutate(New_Loc = as.factor(New_Loc)) %>%
+  ggplot() +
+  geom_boxplot(aes(x=Year, y=RA), fill="black", alpha=0.2) +
+  geom_line(data=trip_loc_sum_y, aes(x= as.factor(Year), 
+                                     y=Date.mn / coeff_RAy,
+                                     group=New_Loc),
+            linetype="dashed",
+            linewidth=0.7,
+            position = position_dodge(width = 0.8))+ # Divide by 10 to get the same range than the temperature
+  geom_errorbar(data=trip_loc_sum_y, aes(x=as.factor(Year), 
+                                          ymin=(Date.mn-Date.sd) / coeff_RAy, 
+                                          ymax=(Date.mn+Date.sd) / coeff_RAy,
+                                          group=New_Loc),
+                width=0.2,
+                linewidth=0.7,
+                position = position_dodge(width = 0.8)) + 
+    scale_color_manual(values=Loc_col) + 
+      scale_fill_manual(values=Loc_col) + 
+  geom_text(data=cld_manual_df, aes(x=Year, y=RA+0.03, label=Letters), size = 4) + 
+  scale_y_continuous(
+    # Features of the first axis
+    name = "Short-tail stingray /trip /month",
+    # Add a second axis and specify its features
+    sec.axis = sec_axis(~.*coeff_RAy, name="Trips /month")
+  ) + 
+  labs(x="Year", 
+       y="Short-tail stingray /trip",
+       fill = "Location") + 
+  guides(color = "none") + 
+  theme(legend.position = "bottom")
+
+
+# trip_plot <- ggplot(trip_sumSum) + 
+#   geom_point(aes(x=Month, y=Date.mn)) +
+#   geom_errorbar(aes(x=Month, ymin=Date.mn-Date.sd, ymax=Date.mn+Date.sd), width=0.3) + 
+#   #stat_summary(data = trip_sum, aes(x=Month, y=Date), geom = "pointrange") + 
+#   # stat_summary(data= STSR_SST, aes(x=Month, y=SST / trip_sst_coeff), colour="blue", geom = "pointrange") +
+#   scale_x_continuous(n.breaks=12) + 
+#   scale_y_continuous(limits = c(0,80)) + 
+#   # scale_y_continuous(
+#   #   # Features of the first axis
+#   #   name = "Trips",
+#   #   # Add a second axis and specify its features
+#   #   sec.axis = sec_axis(~.*trip_sst_coeff, name="SST")
+#   # ) 
+#   labs(y="Trips")
+
+# ggarrange(STSR_count_plot, , 
+#           nrow=2, align="hv")
+
+STSR_RA_y_plot
+
+```
+
+<!--![Short-tail stingray (Bathytoshia brevicaudata) sightings per trip per month (box-and-whisker) around shark cage diving vessels (SCDV), and trips per month (dashed line and errorbars) in Gansbaai, South Africa, between 2014 and 2024.](Manuscript_Figures/fig-STSR_box-1_adj.png){#fig-STSR_box}-->
+
+```{r GAM_prep, results='hide', fig.show='hide'}
+
+STSR_sight_sub <- STSR_sightings %>%
+  select(Day, Month, Year, STSR, New_Loc, 
+         SST, Depth) %>%
+  mutate(Date = as.Date(paste(Day, Month, Year, sep="-"), format="%d-%m-%Y")) %>%
+  filter(Date >= "2014-01-01") %>%
+  mutate(Time = as.numeric(Date)) %>%
+  rename(Location = New_Loc) %>%
+  mutate(SST = as.numeric(SST)) %>%
+  #mutate(Depth = as.numeric(Depth)) %>%
+  #mutate(Depth_log = log(Depth+1)) %>%
+  filter(SST >= 8) %>%
+  select(Date, STSR, Location, 
+         Time, SST, Depth, 
+         Month, Year)
+
+STSR_gam <- gam(STSR ~ 
+            s(SST, bs="tp", k=15) + 
+            s(Depth, bs="tp", k=12) + 
+            s(Time,bs="tp", k=10) + 
+            s(Month, bs="cc", k=12),
+          family = nb,
+          data = STSR_sight_sub)
+
+gam.check(STSR_gam)
+k.check(STSR_gam)
+
+```
+
+
+```{r}
+
+STSR_gam_sum <- summary(STSR_gam)
+
+```
+
+
+All examined smooth terms were statistically significant predictors of short-tail stingray sightings: SST ($\chi^2$ = `r round(STSR_gam_sum$s.table[1,3],2)`, p<0.05), depth ($\chi^2$ = `r round(STSR_gam_sum$s.table[2,3],2)`, p<0.05), across time ($\chi^2$ = `r round(STSR_gam_sum$s.table[3,3],2)`, p < 0.05) and month ($\chi^2$ = `r round(STSR_gam_sum$s.table[4,3],2)`, p < 0.05; @tbl-gam_table). The smooth function for SST showed a nonlinear response, with sighting probability increasing above 15°C (@fig-gam_plots A). The depth smooth term exhibited a peak response between 6-9 meters, followed by increasing uncertainty (widening 2-standard error) beyond 10 meters depth due to the low number of trips at deeper depths (@fig-gam_plots B). The temporal smooth function indicated an increasing trend in sightings after 2017 (@fig-gam_plots C). The seasonal smooth term revealed a bimodal pattern across months, with elevated sightings during March-July and a secondary peak in August-September (@fig-gam_plots D).
+
+
+
+```{r}
+#| label: tbl-gam_table
+#| tbl-cap: "Summary statistics for smooth terms in the GAM model predicting short-tail stingray sightings. edf = estimated degrees of freedom, chi-square test statistics (X²), and significance levels (p-values) for each smooth function. SST = Sea-Surface Temperature."
+
+kable(round(STSR_gam_sum$s.table[,c(1,3:4)],3))
+
+```
+
+```{r gam_plot_prep, results='hide', message=FALSE, error=FALSE, warning=FALSE, fig.show='hide'} 
+
+(STSR_gam_plot <- plot(STSR_gam))
+
+STSR_gam_plot_SST <- STSR_gam_plot[[1]]
+STSR_gam_plot_depth <- STSR_gam_plot[[2]]
+STSR_gam_plot_time <- STSR_gam_plot[[3]]
+STSR_gam_plot_month <- STSR_gam_plot[[4]]
+
+STSR_gam_plot_SST_df <- data.frame(
+  x=STSR_gam_plot_SST$x,
+  fit = STSR_gam_plot_SST$fit,
+  se= STSR_gam_plot_SST$se,
+  xlab = STSR_gam_plot_SST$xlab
+  )
+STSR_gam_plot_SST_ylab <- STSR_gam_plot_SST$ylab
+
+STSR_gam_plot_depth_df <- data.frame(
+  x=STSR_gam_plot_depth$x,
+  fit = STSR_gam_plot_depth$fit,
+  se= STSR_gam_plot_depth$se,
+  xlab = STSR_gam_plot_depth$xlab,
+  ylab = STSR_gam_plot_SST$ylab
+)
+STSR_gam_plot_depth_ylab <- STSR_gam_plot_depth$ylab
+
+STSR_gam_plot_time_df <- data.frame(
+  x=STSR_gam_plot_time$x,
+  fit = STSR_gam_plot_time$fit,
+  se= STSR_gam_plot_time$se,
+  xlab = STSR_gam_plot_time$xlab,
+  ylab = STSR_gam_plot_SST$ylab
+)
+STSR_gam_plot_time_ylab <- STSR_gam_plot_time$ylab
+STSR_gam_plot_time_df$time <- as.Date(STSR_gam_plot_time_df$x, origin = "1970-01-01")
+
+
+STSR_gam_plot_month_df <- data.frame(
+  x=STSR_gam_plot_month$x,
+  fit = STSR_gam_plot_month$fit,
+  se= STSR_gam_plot_month$se,
+  xlab = STSR_gam_plot_month$xlab,
+  ylab = STSR_gam_plot_SST$ylab
+)
+STSR_gam_plot_month_ylab <- STSR_gam_plot_month$ylab
+
+
+STSR_gam_ggplot_SST <- ggplot(STSR_gam_plot_SST_df, aes(x=x, y = fit )) + 
+  geom_line(colour="black") + 
+  geom_ribbon(aes(ymin=fit-se, ymax=fit+se), fill="grey", alpha=0.5) +
+  geom_hline(aes(yintercept=0), linetype="dashed") + 
+  #geom_rug(sides="b") + 
+  labs(x="SST (°C)", #x="log(Depth+1)", 
+       y=STSR_gam_plot_SST_ylab) +
+  theme_classic()
+
+STSR_gam_ggplot_dep <- ggplot(STSR_gam_plot_depth_df, aes(x=x, y = fit )) +
+  geom_line(colour="black") +
+  geom_ribbon(aes(ymin=fit-se, ymax=fit+se), fill="grey", alpha=0.5) +
+    geom_hline(aes(yintercept=0), linetype="dashed") +
+  #geom_rug(sides="b") +
+  labs(x="Depth (m)", #x="log(Depth+1)",
+       y=STSR_gam_plot_depth_ylab) +
+  theme_classic()
+
+STSR_gam_ggplot_time <- ggplot(STSR_gam_plot_time_df, aes(x=time, y = fit )) + 
+  geom_line(colour="black") + 
+  geom_ribbon(aes(ymin=fit-se, ymax=fit+se), fill="grey", alpha=0.5) +
+    geom_hline(aes(yintercept=0), linetype="dashed") + 
+#geom_rug(sides="b") + 
+  labs(x="Date", #x="log(Depth+1)", 
+       y=STSR_gam_plot_time_ylab) +
+  theme_classic()
+
+STSR_gam_ggplot_mon <- ggplot(STSR_gam_plot_month_df, aes(x=x, y = fit )) + 
+  geom_line(colour="black") + 
+  geom_ribbon(aes(ymin=fit-se, ymax=fit+se), fill="grey", alpha=0.5) +
+  scale_x_continuous(breaks=seq(1,12,by=1)) + 
+    geom_hline(aes(yintercept=0), linetype="dashed") + 
+#geom_rug(sides="b") + 
+  labs(x="Month", #x="log(Depth+1)", 
+       y=STSR_gam_plot_month_ylab) +
+  theme_classic()
+
+```
+
+
+```{r } 
+#| label: fig-gam_plots
+#| fig-cap: "Partial effects plots from the GAM model showing smooth functions for short-tail stingray sightings. (A) Response to Sea-Surface Temperature (SST), (B) response to depth, (C) temporal trend between 2014 and 2024, (D) and seasonal pattern. Solid lines represent the fitted smooth functions, shaded areas indicate two standard errors."
+
+ggarrange(STSR_gam_ggplot_SST, STSR_gam_ggplot_dep, 
+          STSR_gam_ggplot_time, STSR_gam_ggplot_mon, 
+          ncol = 2, nrow=2, labels = c("A", "B", "C", "D"),
+          align="hv")
+
+
+```
+
+
+
+### Photographic Identification
+
+
+
+```{r results='hide'}
+
+stsr_ids <- unique(STSR_ID_data$STSR_ID) %>%
+  na.omit()
+STSR_summ_tbl <- NULL
+
+for(id in stsr_ids){
+  
+  STSR_ind <- STSR_ID_data %>%
+  drop_na(STSR_ID) %>%
+  filter(STSR_ID == id)
+  
+  STSR_ind_summ <- data.frame(
+    ID = id,
+    noObs = nrow(STSR_ind), 
+    first_sight = min(STSR_ind$Date),
+    last_sight = max(STSR_ind$Date),
+    period = max(STSR_ind$Date) - min(STSR_ind$Date)
+  )
+  
+  STSR_summ_tbl <- bind_rows(STSR_summ_tbl, STSR_ind_summ)
+}
+
+STSR_ID_sel <- STSR_ID_data %>%
+  drop_na(STSR_ID)
+
+STSR_ID_agg <- dcast(as.data.table(STSR_ID_sel), Year + Month ~ STSR_ID, length, drop=FALSE)
+STSR_ID_agg <- as.data.frame(STSR_ID_agg)
+STSR_ID_agg["days_in_mon"] <- as.integer(days_in_month(STSR_ID_agg$Month))
+STSR_ID_RS <- round(colMeans(STSR_ID_agg[,c(3:13)]/STSR_ID_agg$days_in_mon),4)
+STSR_ID_RS <- STSR_ID_RS %>%
+  as.data.frame() %>%
+  rownames_to_column("ID") 
+colnames(STSR_ID_RS)[2] <- "Relative_Sight"
+
+colnames(STSR_summ_tbl)[1:5] <- c("ID", "Obs", "1stSight", "lastSight", "Duration")
+
+spots <- data.frame(
+  Left_spot = c(5,5,6,4,5,10,7,7,6,8,8),
+  Right_spot = c(8,6,5,6,"-",9,8,5,3,7,6)
+)
+
+STSR_summ_tbl <- STSR_summ_tbl %>%
+  bind_cols(spots) %>%
+  select(ID, Left_spot, Right_spot, `1stSight`, lastSight, Duration, Obs) %>%
+  left_join(STSR_ID_RS, by="ID")
+
+
+```
+
+
+Between 2014 and 2024 eleven short-tail stingrays were identified across `r STSR_ID_data %>% drop_na(STSR_ID) %>% nrow()` positive sightings. These ranged from a single sighting for individual STSR005 (Relative Sighting = 0.0003), to 156 sightings for individual STSR002 (Relative Sighting = 0.0389; @tbl-ID_summary; across study period: @fig-ID_sighting A, across months: @fig-ID_sighting B). The average period between first and last sighting was `r round(mean(STSR_summ_tbl$Duration)[[1]],1)` days (± `r round(sd(STSR_summ_tbl$Duration)[[1]],1)` days, ± sd). 
+There was a consistent increase in identification of short-tail stingrays across the time period (@fig-ID_sighting C), with an average increase of one new individual sighted every 238 days. There was a sharp increase in new positive identifications in late 2017, which correlated with the overall increase in sightings of short-tail stingray during this period (@fig-STSR_box, @fig-gam_plots C), and identified individual showed the same dip in detections between 2020 and 2021 as the sightings as a result of the impact on tourism due to the national COVID-19 lockdown. 
+Sightings of short-tail stingray individuals across months was consistent with the same bimodal pattern as seen with the GAM model output of sightings data (@fig-gam_plots D; @fig-ID_sighting B). 
+<!--Short-tail stingray individuals were primarily seen on days with warmer SST each month, including during the austral winter months (@fig-ID_sighting D). While variation in SST was higher during the austral summer months, and lower during the austral winter months, the SST on days when short-tail stingray individuals were sighted deviated from the overall mean SST during the former months and matched closer with the latter. -->
+
+Examination of the spots on individuals at different points in time over the course of the study period showed that the spots remained consistent in number of individual spots and composition (@fig-SpotTime). Between individuals, spot patterns varied in number, with clusters on both the left and right side of the head positioned in different constellations. The number of spots ranged from 4 to 10 on the left side, and 3 to 9 on the right side, with one individual (STSR005) unconfirmed (@tbl-ID_summary; See Supplementary Materials XXXX). 
+All individuals were identified as female, with the exception of STSR005, where sex could not be confirmed. Therefore sex was not considered a factor in subsequent analyses. 
+
+```{r, results='hide'}
+# | label: tbl-ID_summary
+# | tbl-cap: "Summary table of STSR individuals during the study period."
+
+# kable(STSR_ID_summ)
+
+```
+
+
+
+
+```{r }
+
+
+ID_y_plot <- STSR_ID_data %>%
+  drop_na(STSR_ID) %>%
+  ggplot(aes(x=Date, y=STSR_ID)) + 
+  geom_point() +
+  # geom_text(data=STSR_ID_summ, aes(x= as.Date("2026-01-01", format="%Y-%m-%d"),
+  #                                  y= STSR_ID, 
+  #                                  label=Count)) + 
+  scale_y_discrete(limits=rev) + 
+  # coord_cartesian(xlim=c(as.Date("2014-10-01", format="%Y-%m-%d"), 
+  #                        as.Date("2024-12-31", format="%Y-%m-%d")),
+  #                 clip = 'off') +
+  #scale_y_continuous(breaks=seq(1,12, by=2)) + 
+  coord_cartesian(xlim=c(as.Date("2014-01-01", format="%Y-%m-%d"), 
+                      as.Date("2024-12-31", format="%Y-%m-%d"))) +
+  labs(
+    y = "Short-tail stingray ID",
+    x=""
+  ) +
+  theme(panel.grid.major.y = element_line(colour="lightgrey"),
+        panel.grid.minor.y = element_line(colour="lightgrey")) + 
+theme(plot.margin = unit(c(1,3,1,1), "lines"))
+
+ID_y_dens_plot <- STSR_ID_data %>%
+  drop_na(STSR_ID) %>%
+  ggplot(aes(x=Date)) +
+  geom_density(fill="grey", alpha=0.5) + 
+    coord_cartesian(xlim=c(as.Date("2014-01-01", format="%Y-%m-%d"), 
+                      as.Date("2024-12-31", format="%Y-%m-%d"))) +
+  theme(axis.text.y = element_blank(),
+        axis.line.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.title.y = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank())
+
+ID_year_plots <- ggarrange(ID_y_dens_plot, ID_y_plot, nrow=2, heights = c(1,4), align = "hv")
+
+STSR_ID_mon_prep <-  STSR_ID_data %>%
+  select(STSR_ID, Date) %>%
+  dplyr::rename(STSR = STSR_ID) %>%
+  # Parse the date from dd-mm-yyyy format
+  mutate(date_parsed = ymd(Date)) %>%
+  # Extract year for coloring
+  mutate(year = year(date_parsed)) %>%
+  # Calculate day of year (1-365/366)
+  mutate(day_of_year = yday(date_parsed)) %>%
+  # Create a standardized date for x-axis (using 2020 as base year for leap year handling)
+  mutate(standard_date = as.Date(paste0("2020-", format(date_parsed, "%m-%d"))))
+
+SST_summary <- aggregate(SST ~ Date, STSR_sightings, mean)
+
+STSR_ID_mon_prep_sst <- STSR_ID_mon_prep %>%
+  left_join(SST_summary, by="Date") %>%
+  mutate(month = month(Date)) %>%
+  filter(Date > "2014-01-01")
+
+# Create custom x-axis breaks and labels for months
+month_breaks <- as.Date(c("2020-01-01", "2020-02-01", "2020-03-01", "2020-04-01",
+                          "2020-05-01", "2020-06-01", "2020-07-01", "2020-08-01",
+                          "2020-09-01", "2020-10-01", "2020-11-01", "2020-12-01"))
+
+month_labels <- c("Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+spp_grps <- data.frame(
+  STSR = c("STSR001", "STSR004", "STSR005", "STSR006", "STSR007", "STSR009", "STSR010", "STSR011", 
+           "STSR002", "STSR003", "STSR008"), 
+  Group = c(rep("A", 8), rep("B",3))
+)
+
+STSR_ID_mon_prep["Group"] <- spp_grps[match(STSR_ID_mon_prep$STSR, spp_grps$STSR), "Group"]
+
+# Create the plot
+ID_mon_plot <- STSR_ID_mon_prep %>%
+  drop_na(STSR) %>%
+  ggplot(aes(x = standard_date, y = STSR)) + #, color = factor(year))) +
+  geom_point() +
+  scale_x_date(
+    breaks = month_breaks,
+    labels = month_labels,
+    limits = as.Date(c("2020-01-01", "2020-12-31"))
+  ) +
+  scale_y_discrete(limits=rev) + 
+  # facet_grid(Group ~ ., scales="free_y", space="free_y") + 
+  # scale_y_continuous(
+  #   breaks = pretty_breaks(n = 8)
+  # ) +
+  scale_color_viridis_d(name = "Year") +
+  labs(
+    #title = "Seasonal Pattern of Sightings by Year",
+    x = "Month",
+    y = "Short-tail stingray ID"
+  ) +
+  theme(
+panel.grid.major.y = element_line(colour="lightgrey"),
+panel.grid.minor.y = element_line(colour="lightgrey")
+  )
+
+ID_mon_dens_plot <- STSR_ID_mon_prep %>%
+  drop_na(STSR) %>%
+  ggplot(aes(x=standard_date)) +
+  geom_density(fill="grey", alpha=0.5) + 
+  theme(axis.text.y = element_blank(),
+        axis.line.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.title.y = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank())
+
+ID_month_plots <- ggarrange(ID_mon_dens_plot, ID_mon_plot, nrow=2, heights = c(1,4), align = "hv")
+
+#### Accummulation curve
+# select date and ID columns
+STSR_ID_l <- STSR_ID_data %>%
+  select(Date, STSR_ID) %>%
+  filter(Date >= "2014-01-01")
+
+STSR_dd <- data.frame(
+  Date = unique(STSR_sightings$Date)
+)
+
+# STSR_dd <- data.frame(
+#   Date = seq(as.Date("01-01-2014", format="%d-%m-%Y"), 
+#              as.Date("31-12-2024", format="%d-%m-%Y"), by="day")
+# )
+
+# Widen dataset (community matrix)
+STSR_ID_w <- dcast(as.data.table(STSR_ID_l), Date ~ STSR_ID, length) 
+# Remove columns with NA. 
+STSR_ID_w <- STSR_ID_w[,-2] 
+STSR_ID_w <- as.data.frame(STSR_ID_w)
+
+STSR_dd <- STSR_dd %>%
+  left_join(STSR_ID_w, "Date")
+
+# Move data-column to rownames
+STSR_dd <- column_to_rownames(STSR_dd, "Date")
+STSR_dd[is.na(STSR_dd)] <- 0
+
+# Perform accumulation curve on ID. 
+STSR_accum <- specaccum(STSR_dd,
+                        method = "collector") # possible to use rarefaction
+
+STSR_rare_extr <- specpool(STSR_dd)
+
+STSR_accum_df <- as.data.frame(STSR_accum$perm) %>%
+  rename(Count = V1) %>%
+  rownames_to_column("Date") %>%
+  mutate(Date = as.Date(Date)) 
+STSR_accum_df <- STSR_accum_df %>%
+  mutate(Date_num = 1:nrow(STSR_accum_df))
+
+
+STSR_accum_plot <- ggplot(STSR_accum_df, aes(x=Date)) + 
+  geom_line(aes(y=Count)) + 
+  #geom_ribbon(aes(ymin=Richness-sd, ymax=Richness+sd), alpha=0.2) + 
+  #geom_abline(aes(intercept=0.30236, slope=0.00421), col="red") + 
+  scale_y_continuous(breaks=seq(0, 12, by=2)) + 
+  labs(x="Date", y="Count")
+  #labs(x="Days with trips", y="Richness")
+
+
+#### SST ID
+
+STSR_newGraph <- STSR_ID_data %>%
+  drop_na(STSR_ID) %>%
+  mutate(Month = month(Date)) %>%
+  mutate(Month_dt = as.Date(paste("2020",Month,"01", sep="-"),
+                            format="%Y-%m-%d"))
+
+aggf <- \(x) {
+n <- length(x)
+xmn <- mean(x)
+xsd <- sd(x)
+se <- xsd/sqrt(n)
+ci <- xmn + se*(-qt(p=.05/2, df=n - 1)) %*% cbind(-1, 1)
+c(mean=xmn, sd=xsd, se=se, ci=ci)
+}
+
+SST_summary_agg <- aggregate(SST ~ month(Date), SST_summary, aggf)
+SST_summary_agg <- do.call("data.frame",SST_summary_agg)
+colnames(SST_summary_agg)[1] <- "Month"
+SST_summary_agg <- SST_summary_agg %>%
+  mutate(Month_dt = as.Date(paste("2020",Month,"01", sep="-"),
+                            format="%Y-%m-%d"))
+
+
+STSR_SST_plot <- ggplot() + 
+  geom_boxplot(data=STSR_newGraph, aes(x=Month_dt, y=SST, group=Month)) +
+  geom_point(data=STSR_newGraph, aes(x=Month_dt, y=SST), shape=1) + 
+  geom_line(data=SST_summary_agg, aes(x=Month_dt, y=SST.mean), 
+            col="black", linetype="dashed") + 
+  geom_ribbon(data=SST_summary_agg, aes(x=Month_dt, 
+                                        ymin=SST.mean-SST.sd,
+                                        ymax=SST.mean+SST.sd),
+              alpha=0.1, fill="black") +
+  scale_x_date(
+    breaks = month_breaks,
+    labels = month_labels#,
+    #limits = as.Date(c("2019-12-31", "2020-12-31"))
+  ) +
+  labs(x="Month") + 
+#  geom_smooth(method="loess", span=0.4, col="black") + 
+  theme_classic()
+
+
+```
+
+
+```{r}
+#| label: tbl-ID_summary
+#| tbl-cap: "Summary table of short-tail stingray sightings between 2014 and 2024 in Gansbaai, with number of identifying spots on the left and right side of the head, date of first and last sighting, the duration between first and last sighting, number of observations, and relative sighting."
+
+
+kable(STSR_summ_tbl)
+
+```
+
+```{r , message=FALSE, warning=FALSE, error=FALSE, echo=FALSE}
+#| label: fig-ID_sighting
+#| fig-cap: "Sightings plot of individual short-tail stingray sightings in Gansbaai between 2014 and 2024 (A) across the study period, and (B) across months, with density plots, (C) accumulation curve of short-tail stingray sightings during this time period, and (D) Sea-Surface Temperature (SST) during the time of sighting (box-plot and dots), and monthly average SST (dashed line) with standard deviation (grey ribbon). NOTE: ALIGNMENT OF FIGURES NEED TO BE IMPROVED: DENSITY PLOTS CLOSER TO ABACUS PLOT, ACCUMULATION CURVE ALIGN WITH (A), DATE AXES CONSISTENT."
+#| fig-height: 10
+#| fig-width: 10
+
+#ggarrange(ID_y_plot , ID_mon_plot, ncol=2, align="hv", labels = c("A", "B"))
+
+ggarrange(
+  ID_year_plots,
+  ID_month_plots,
+  STSR_accum_plot,
+  STSR_SST_plot,
+  ncol = 2,nrow = 2, align = "hv", labels = c("A", "B", "C", "D"),
+  heights=c(2,1)
+)
+
+```
+
+
+
+::: {.landscape}
+
+![Comparison of identifying spots on short-tail stingrays at different points during the study period, using individuals 2 and 6. Individual 2 presented with a large bite wound towards the later part of the study period. ](Images/Spot_comparison/STSR_Spot_Comparison_timeline.png){#fig-SpotTime}
+
+:::
+
+
+```{r ID_tbl, echo=FALSE, results='hide'}
+
+ID_tbl_y <- dcast(as.data.table(STSR_ID_data), STSR_ID ~ Year, length, value.var="STSR_ID")
+ID_tbl_m <- dcast(as.data.table(STSR_ID_data), STSR_ID ~ Month, length, value.var="STSR_ID")
+ID_tbl_seas <- dcast(as.data.table(STSR_ID_data), STSR_ID ~ Season, length, value.var="STSR_ID")
+
+kable(ID_tbl_y)
+kable(ID_tbl_m)
+kable(ID_tbl_seas)
+
+STSR_ID_cumm <- dcast(as.data.table(STSR_ID_data),  Month + Year ~ STSR_ID, length, value.var="STSR_ID")
+STSR_ID_cumm <- STSR_ID_cumm %>%
+  select(-`NA`) %>%
+  rowwise() %>%
+  mutate(nonzero_stsr_count = sum(c_across(contains("STSR")) != 0, na.rm = TRUE)) %>%
+  ungroup() %>%
+  mutate(Date = dmy(paste("01", Month, Year, "-")))
+
+# ggplot(STSR_ID_cumm, aes(x=Date, y=nonzero_stsr_count)) +
+#   geom_col()
+
+```
+
+
+
+```{r , echo=FALSE}
+
+# STSR_accum_df <- data.frame(STSR_accum$richness, STSR_accum$sites,STSR_accum$sd)
+# colnames(STSR_accum_df) <- c("Richness","Sites","sd") 
+# 
+# STSR_accum_lm <- summary(lm(tail(STSR_accum_df,3)[,1:2]))
+# 
+# b = STSR_accum_lm$coefficients[[2]]
+# Sb = STSR_accum_lm$coefficients[[4]]
+# 
+# t_BRUV = (b-0)/Sb
+# # format(t_BRUV, scientific = FALSE)
+# 
+# t_BRUV_p <- pt(t_BRUV, (tail(STSR_accum_df,1)[,2]-1)) 
+# 
+# Spp_est <- specpool(STSR_dd)
+
+# STSR_accum_df <- data.frame(
+#   sites = STSR_accum$sites, 
+#   richness = STSR_accum$richness,
+#   sd = STSR_accum$sd
+# )
+# Plot accumulation curve
+```
+
+<!-- that the curve reached an asymptote at 11. Extrapolation of the rarefaction curve indicated that a limited number of additional individuals would be sighted: Chao = `r STSR_rare_extr[[2]]` ± `r round(STSR_rare_extr[[3]],2)` (± se); bootstrap = `r round(STSR_rare_extr[[7]],2)` ± `r round(STSR_rare_extr[[8]],2)`. Both the presence of an asymptote and limited further extrapolation suggests that the maximum number of short-tail stingray individuals has been identified in the Gansbaai area.[WONDER IF THIS LAST SENTENCE SHOULD REMAIN HERE, OR GO TO THE DISCUSSION]   -->
+
+
+```{r, results='hide', fig.show='hide'}
+# | label: fig-ID_prop_sight
+# | fig-cap: "Proportion of identified short-tail stingray sightings out of total number of sightings per month in Gansbaai between 2014 and 2024."
+
+STSR_data <- STSR_ID_data %>%
+  filter(Date >= "2014-01-01") %>%
+  select(STSR_ID, Date)  %>%
+  rename(individual_id = STSR_ID)
+STSR_data["encounter_id"] <- seq(1:nrow(STSR_data))
+
+
+preprocess_data <- function(data) {
+  # Clean and prepare data
+  processed_data <- data %>%
+    mutate(
+      date = as.Date(Date),
+      year = year(Date),
+      month = month(Date),
+      julian_day = yday(Date),
+      is_identified = !is.na(individual_id)
+    ) %>%
+    filter(!is.na(date)) %>%
+    arrange(date)
+  
+  return(processed_data)
+}
+
+data_clean <- preprocess_data(STSR_data)
+
+temporal_summary <- data_clean %>%
+    mutate(year_month = floor_date(date, "month")) %>%
+    group_by(year_month) %>%
+    summarise(
+      total_encounters = n(),
+      identified_encounters = sum(!is.na(individual_id)),
+      unique_individuals = length(unique(individual_id[!is.na(individual_id)])),
+      .groups = "drop"
+    )
+  
+p1 <- ggplot(temporal_summary, aes(x = year_month)) +
+    geom_line(aes(y = total_encounters, color = "Total"), size = 1) +
+    geom_line(aes(y = identified_encounters, color = "Identified"), size = 1) +
+    scale_color_manual(values = c("Total" = "black", "Identified" = "blue")) +
+    labs(#title = "Encounters Over Time", 
+         x = "Date", y = "Number of Encounters",
+         color = "Type") + 
+  theme(legend.position = "bottom")
+p1
+
+
+```
+
+```{r}
+
+POPAN_summTbl <- read_csv("Manuscript_Figures/POPAN_summary_table.csv")
+
+POPAN_summTbl$weight <- round(POPAN_summTbl$weight,4)
+POPAN_summTbl$rank <- seq(1,8,by=1)
+
+CJS_EstAbund <- read_csv("Manuscript_Figures/CJS_EstimatedAbundance.csv")
+colnames(CJS_EstAbund)[3:4] <- c("perc25", "perc975")
+
+CJS_ResTbl <- read_csv("Manuscript_Figures/CJS_Result_tbl.csv")
+
+
+
+```
+
+
+
+The POPAN model with constant apparent survival (Φ), constant detection probability (p), and constant entry probability (pent) <!--, and constant super-population size (N) --> converged successfully after 36 function evaluations. The model yielded an AICc value of 114.456 and a deviance of 52.851 (@tbl-CJS_plot). Estimated apparent survival probability was high (Φ = 0.950 ± 0.029 SE, 95% CI: 0.850–0.985), indicating strong year-to-year persistence of individuals in the population (@tbl-POPAN_res). Detection probability was moderate (p = 0.745 ± 0.065 SE, 95% CI: 0.599–0.851), suggesting that approximately three-quarters of individuals present during a sampling occasion were detected. The entry probability into the super-population was low (pent = 0.080 ± 0.020 SE, 95% CI: 0.049–0.128), indicating relatively few new individuals recruited or immigrated into the study area each year. The estimated super-population size was 11.00 individuals (95% CI: 11.00–11.00). Population size estimates increased from 4.03 individuals (95% CI: 1.34–10.1) in the first sampling occasion to 9.4 individuals (95% CI: 2.69–13.4) by the ninth occasion (@fig-CJS_plot), with a fluctuating pattern. Net recruitment (birth plus immigration) was estimated at 0.876 individuals per year (95% CI: 0.543–1.414). <!--, contributing to the observed population growth over the study period. -->
+
+
+```{r}
+#| label: tbl-CJS_plot
+#| tbl-cap: "List of candidate POPAN models fitted to the sightings data used to obtain more-precise estimates of apparent survival (phi) for short-tail stingrays, including the model rank, number of parameters (npar), Akaike’s information criterion for small sample sizes (AICc), AICc difference to the best-fit model (∆AICc), model weight and model deviance. Best-fit model is shown in bold. phi = survival probability; p = capture probability; pent = entry probability; N = super-population size;  ~time = time-varying; (~1) = time-constant."
+
+
+
+POPAN_summTbl %>%
+select(model, rank, npar, AICc, DeltaAICc, weight, Deviance) %>%
+#POPAN_summTbl$model <- gsub("~", "\\\\textasciitilde ", POPAN_summTbl$model)
+mutate(model = str_replace_all(model, 
+            pattern = "~", replacement = "\\\\textasciitilde ")) %>%
+kable(digits=3)
+
+# kable(POPAN_summTbl[,5:ncol(POPAN_summTbl)])
+
+```
+
+
+```{r}
+#| label: tbl-POPAN_res
+#| tbl-cap: "Parameter estimates from the POPAN open population model for short-tail stingrays in Gansbaai, South Africa. Phi = survival probability, p = capture probability, N = super-population size, pent = entry probability. Subscripts denote time interval (t). Values shown are maximum likelihood estimates with standard errors (se) and 95% confidence intervals (lower confidence limit, lcl; upper confidence limit, ucl)."
+
+CJS_ResTbl %>% 
+select(Variable, estimate, se, lcl, ucl) %>%
+kable(digits=3)
+
+```
+
+
+```{r}
+#| label: fig-CJS_plot
+#| fig-cap: "Estimates population size (N) of short-tail stingrays from POPAN open population model from 2015 to 2024 with 97.5% confidence intervals."
+
+
+POPAN_plot <- ggplot(CJS_EstAbund, aes(x=Year, y=estim_abundance)) + 
+  geom_point() +
+  geom_line(aes(group=1)) + 
+  geom_ribbon(aes(ymin=perc25, 
+                              ymax = perc975), alpha=0.3) + 
+  scale_x_continuous(breaks=seq(2015,2024,by=1)) + 
+  labs( y = "Estimated population size\n(and 97.5% confidence interval)") + 
+  coord_cartesian(ylim=c(-1,15)) + 
+  theme(panel.grid.major.y = element_line(linewidth = 1))
+
+POPAN_plot
+
+
+```
+
+
+
+## Discussion 
+
+<!--`Look at Westhuizen and Westhuizen (February 2016) and ORI tag dates (December 2017 - January 2018) to see whether stingrays are tagged near St. Helena Bay in specific months. Note similar shallow inshore benthic habitat preference`-->
+
+This study presents the first population study of short-tail stingrays in South Africa, and with `r n_days` operational days across eleven years the longest continual observation study of this species on a global level. During this period a total of `r n_STSR` short-tail stingrays were recorded, showing a site-restricted sustained increase in sightings over the course of the study period. A total of eleven individuals were identified over the course of the study period, showing considerable inter-individual variation in residency time, from single-visit transients to near-decade seasonal residents, with fluctuations in yearly population size estimates ranging between 4 and 11 individuals. This abundance estimate is similar to another known aggregation sites for the species [@pini2018effects]. 
+The sustained observations support the usage of individual spot patterns applied to identification, providing understanding of long-term habitat usage and population structure. The combined use of sightings data and photographic identification allows for population-level inference that neither method alone can support.
+
+Sea Surface Temperature over 15°C showed to have a positive effect on sightings of short-tail stingrays, which matches with the known thermo-tolerance range seen in the species in Australia [@le2008observations] and explains its distribution along South Africa's coastline in relation to the thermogradient along the coastline [@roberson2017pelagic]. Furthermore, this higher temperature preference explains occasional captures of short-tail stingrays during the austral summer further north-west in St. Helena Bay [@van2016extension; @elston2025], where SST reaches higher than average temperatures during the austral summer [@hutchings2012st]. Further movement behaviour studies would elucidate this potential seasonal distribution shift, identify potential mating aggregation areas, and whether the short-tail stingray display seasonal migrations that concur with annual changes in temperatures along the south west coast of South Africa [@demarcq2003climatology]. 
+
+The bimodal seasonal sightings of short-tail stingrays in this study runs contrary to what is known elsewhere: In New Zealand aggregations of short-tail stingrays are associated with mating during the austral summer [@le2012conservation], and therefore, if this was a potential mating aggregation, an austral summer peak would be expected here as well. If behaviour between New Zealand and South Africa is consistent, this suggests short-tail stingrays are likely moving away to a mating aggregation site not located at the study site. 
+
+
+The increase of both sightings and identified short-tail stingray individuals after 2017 adds additional evidence for a potential ecosystem change as a result of the white shark disappearance from the area [@towner2022fear]. Following the dispersal of white sharks, there was a significant increase of bronze whaler sharks in the area [@towner2022fear], and an increase in sunfish sightings (*Mola* spp.) over a similar time period (2014-2023; @watson2023patterns). Killer whale predations have been linked to abrupt displacement of white sharks and subsequent ecological cascades across multiple systems [@jorgensen2019killer; @towner2022fear; @bowlby2023decline], though the nature and duration of displacement varies considerably by site. In South Africa, repeated and frequent killer whale predations have led to long-term site abandonment [@towner2022fear], whereas predations at the Farallon Islands are infrequent and isolated, resulting in comparatively brief absences of approximately one week to eight months [@jorgensen2019killer]. As white sharks are known predators of large batoids [@hussey2012size; @grainger2020diet], reduced white shark presence may have lowered perceived predation risk for short-tail stingrays, facilitating an increase in surfacing behaviour around SCDV.
+
+
+Variation in sightings of eleven identified individuals across 398 positive sightings, ranging from a single visit to regular sightings across a near-decade, with a slowly increasing accumulation curve, concurrent with a low positive entry probability, suggests the presence of small, open, partially resident, local assemblage of short-tail stingrays, embedded within a broader regional population.
+With an average period between first and last sightings of over 1800 days of individuals within this study, concentrated almost entirely at Joubertsdam, with confirmation that the spot patterns remain stable across the entirety of the study period, this validates the interpretation of long-term site fidelity. 
+The Oceanographic Research Institute's Cooperative Fish Tagging Project (ORI-CFTP) recorded 5 recaptures out of 184 tagged individuals (`r round((5/184)*100,2)`%) over a 40 year time span [@elston2025], of which four were recaptured within 10 km from their initial capture location, between 1 and 77 days from initial tagging [@elston2025]. 
+This underscores the value of photographic identification as a methodological framework for tracking short-tail stingrays, as this elevates detection probability without actively tagging them. 
+
+
+While the high apparent survival and moderate detection probabilities of the POPAN model are ecologically plausible for large, long-lived batoids, the estimated super-population matching the observed total and narrow confidence intervals around N, suggests that, despite the long timeframe of the dataset, the model is constrained by the data, rather than estimating a true population size. The year-to-year fluctuations in estimated population size reflects the combined effects of COVID-19 disruption to survey effort and genuine interannual variation in residency. These therefore should not be considered representative of demographic instability. Furthermore, the low entry probability also implies minimal annual recruitment into the local detectable population, which is consistent with the accumulation curve and the life history characteristics of the species.
+
+<!--Furthermore, the concentration of short-tail stingrays around Joubertsdam are unlikely to be linked to an absence of white sharks in this area, as white sharks were known to seasonally shift their presence between Dyer Island and Joubertsdam [@towner2013environmental; @towner2016sex]. -->
+
+
+This study documents a small, predominantly female assemblage of short-tail stingrays at a provisioned aggregation site. As the species is subject to bycatch pressure from multiple fisheries and historically exposed to recreational angling, this work adds value to the usefulness of ecotourism, such as SCDV operations, as a long-term monitoring platform, as seen with other species [@diamant2021population; @towner2022fear; @watson2023patterns; @lacetera2023using] whereby the sample size across the time-span here would be prohibitively expensive through active survey design. Specific uncertainties remain, such as whether male short-tail singrays aggregate elsewhere, as consistent with the male-biased dispersal seen elsewhere [@roycroft2019population]; and whether the aggregation in Gansbaai is connected to other aggregations along the coastline, such as Miller's Point in False Bay, or Struisbaai. Examining movement connectivity through the use of acoustic telemetry or PSAT tagging [@le2008observations] are logical next steps. Furthermore, establishing photographic identification databases across other aggregation sites along the coastline would allow for the establishment of a coastwide mark-recapture framework that would be able to generate population estimates with conservation management applications. 
+
+
+
+
+<!-- XXXXXXX -->
+
+<!-- Stingrays at a local aggregation site in Jervis Bay, Australia, were all identified as female [@pini2018effects].  -->
+
+
+<!-- The long study period allowed for spot comparison across multiple years, with the longest time period of re-sightings being STSR002, with sightings across 3633 days (9 years, 11.5 months). The study period was shorter than the suspected generation length (assuming a similar generation length of the congener *B. lata*, 21.5 years). A continuation of long-term individual re-sighting monitoring would benefit further confirmation of species specific life history traits. -->
+<!-- Both the presence of an asymptote and limited further extrapolation suggests that the maximum number of short-tail stingray individuals has been identified in the Gansbaai area. The presence of limited-sighted individuals, such as STSR005, STSR009 and STSR010, suggests that while some individuals are sighted, they do not remain present in the area for long. With the large number of trips (n=`r n_trips`) performed over the course of the study period, it is unlikely that individuals that are resident in the area were missed. It is likely that any additional individuals sighted are either not part of the local population, or newly arrived individuals.  -->
+
+<!-- Over the course of the study period, three short-tail stingrays presented with bite marks on their body, with large chunks of flesh removed. While some of these appeared to be relatively fresh, they did not appear to be life-threatening, and were later used as an additional factor of identifying individuals. Incidences were documented during operations where multiple, high trophic-level species are brought together. Video footage from a shark cage diving operator of a white shark predation on a short-tail stingray was captured within the Joubertsdam diving site range in January 2020, offering a direct example of the predator-prey relationship between the species. Apart from this single incident, no other interactions were recorded that resulted in injuries to short-tail stingrays. As these animals are not sighted on a day-to-day basis, it is likely that the additional injury-causing incidences occurred elsewhere, as the distribution of the short-tail stingray overlaps with several high level predators in the area such as the broadnose sevengill cowshark (*Notorynchus cepedianus*). -->
+<!-- While the ragged-tooth shark (*Carcharias taurus*) is not seen around the SCDV, it is known to occur in the area (REF), inhabits similar areas as the short-tail stingray, and has the potential to inflict the bite mark, and should therefore not be excluded from potential causes. -->
+
+<!--Due to the size and bite-strength required, it is unlikely that these were a result of the highly present bronze whalers, while it is feasible that the bite marks were as a result of white shark or broadnose sevengill cowshark (*Notorynchus cepedianus*) interactions.-->
+
+<!-- This study provides specific insight into the spatial and temporal behavior of short-tail stingrays from opportunistic SCDV operations, validating the usage of spot identification as a non-invasive mark recapture technique. The predominance of female individuals observed over extended periods suggests high site fidelity, with unlikely usage for mating purposes and an affinity for shallow, temperate habitats. The application of photo-identification is limited to wider dispersal but locally identified population estimates and residence time of local short-tail stingrays. Continued application of spot identification alongside incorporation of acoustic and PSAT tagging would further enhance understanding of short-tail stingray ecology and life history patterns for South Africa. Ultimately, this study highlights an accessible technique applicable to long-term monitoring of short-tail stingrays. With application to further aggregations along the South African coast, and incorporation of complementary tagging approaches, the ecological structure and responses to abiotic factors by short-tail stingrays can be more robustly characterised, facilitating the development of integrated, long-term monitoring and conservation initiatives. -->
+
+
+## Acknowledgements
+
+The authors thank Wilfred Chivell for funding and facilitating data collection, the guides and crew of Marine Dynamics and interns and volunteers from Marine Dynamics Academy for collecting the data, and Kirsten Schut for conducting the initial exploratory analysis.
+
+
+## Authors
+RGA Watson: ORCID: 0000-0003-1105-9879
+
+- Department of Biological Sciences, University of Cape Town, Cape Town, Western Cape, South Africa
+
+
+AJ Webber: ORCID: 0009-0001-2966-5343
+
+- Dyer Island Conservation Trust, Gansbaai, Western Cape, South Africa. 
+
+## Supplementary Materials
+Table: Description of the spots of identified short-tail stingray individual's found in Gansbaai between 2014 and 2024. The total spot count and configuration across left and right sides are described. Left and right are considered from a ventral side, pointing anteriorally, and may differ from the orientation of the photo. 
+
+## Bibliography
+
+::: {#refs}
+:::
