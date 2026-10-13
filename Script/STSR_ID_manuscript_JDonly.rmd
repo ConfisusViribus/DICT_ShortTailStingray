@@ -2,9 +2,9 @@
 title: "Long-term site fidelity and environmental drivers of (Bathytoshia brevicaudata) occurrence at a provisioned aggregation site in South Africa: evidence from decade-scale sightings data and photographic identification. (version 2)"
 author: "RGA Watson and AJ Webber"
 format: 
-  docx
-  #pdf:
-  # fig-pos: "H"
+  #docx
+  pdf:
+   fig-pos: "H"
 header-includes:
   - \usepackage{lineno}
   - \linenumbers
@@ -44,8 +44,9 @@ options(scipen=999)
 
 ```{r load_data , message=FALSE, warning=FALSE, error=FALSE, echo=FALSE}
 
+file <- dir("~/Documents/GitHub", pattern = "STSR SF Master 2014-2024_LocDepth.xlsm", recursive = T, full.names = T)
 
-STSR_sightings <- read_excel("RAW Data/STSR SF Master 2014-2024_LocDepth.xlsm",
+STSR_sightings <- read_excel(file[2],
                              sheet="Cage sightings")
 STSR_sightings["Date"] <- as.Date(paste(STSR_sightings$Day, 
                                         STSR_sightings$Month,
@@ -106,11 +107,14 @@ STSR_CummSum <- STSR_CummSum[order(STSR_CummSum$Date),]
 STSR_CummSum["STSR_CummSum"] <- cumsum(STSR_CummSum$STSR)
 
 
-STSR_ID_data_raw <- read_excel("RAW Data/STSR SF Master 2014-2024_LocDepth.xlsm",
+STSR_ID_data_raw <- read_excel(file[2],
                            sheet="STSR sightings")
 STSR_ID_data <- STSR_ID_data_raw %>%
   mutate(Date = as.Date(paste(Day, Month, Year, sep="-"), format="%d-%m-%Y")) %>%
   dplyr::rename(STSR_ID = `STSR ID 1`) %>%
+  separate_rows(STSR_ID, sep = ",") %>%
+  mutate(STSR_ID = str_trim(STSR_ID)) %>%   # remove stray spaces after commas
+  filter(!is.na(STSR_ID), STSR_ID != "") %>%
   mutate(STSR_ID = as.factor(STSR_ID)) %>%
   mutate(SST = as.numeric(SST)) %>%
   mutate(Year = year(Date)) %>%
@@ -125,14 +129,7 @@ STSR_ID_data <- STSR_ID_data_raw %>%
 
 ## Abstract
 
-#### Background
-Large coastal elasmobranchs face disproportionate extinction risk yet remain among the most data-deficient marine vertebrates globally. Photo-identification has emerged as a powerful non-invasive tool for studying individually recognizable species, though its application to batoids remains limited relative to sharks. The short-tail stingray is a large demersal batoid distributed anti-tropically across the Southern Hemisphere, for which site fidelity, habitat associations, and local population structure remain poorly characterized across most of its range. This study applied long-term sightings data and photographic identification to characterize occurrence patterns, individual residency, and local abundance at an aggregation site in Gansbaai, South Africa.
-
-#### Results
-Between 2014 and 2024, short-tail stingrays were recorded on 1149 of 7530 boat-based trips, yielding 1351 sightings concentrated at a single shallow inshore site. Sea surface temperature, depth, season, and time are significant predictors of occurrence. Sightings increasing above 15°C, peaking at 6–9 m depth, and displaying a bimodal seasonal pattern inconsistent with summer mating aggregations documented elsewhere. Sightings increased markedly after 2017, coinciding with documented white shark displacement from the area. Photographic identification of dorsal spot patterns cataloged eleven individuals across 398 positive identifications, with residency spanning from single visits to near-decade repeated associations. An open population mark-recapture model estimated high apparent survival (0.95), moderate detection probability (0.75), and a super-population of eleven individuals with low annual recruitment.
-
-#### Conclusions
-This study represents the first population-level assessment of short-tail stingrays in South Africa and the longest continuous observational record of the species globally. Results support the presence of a small, predominantly female, partially resident assemblage exhibiting long-term site fidelity, embedded within a broader regional population. The findings demonstrate that opportunistic platforms such as shark cage diving operations can function as cost-effective monitoring systems for coastal elasmobranchs, and validate photographic identification as a viable mark-recapture framework for batoids with naturally stable pigmentation patterns. 
+Large coastal elasmobranchs face disproportionate extinction risk yet remain among the most data-deficient marine vertebrates globally. Photo-identification has emerged as a powerful non-invasive tool for studying individually recognizable species, though its application to batoids remains limited relative to sharks. This study applied decade-scale sightings data and photo-identification to characterize occurrence patterns, individual residency, and local abundance of the short-tail stingray (Bathytoshia brevicaudata) at an aggregation site in Gansbaai, South Africa, a species for which site fidelity and population structure remain poorly characterized across most of its Southern Hemisphere range. Between 2014 and 2024, short-tail stingrays were recorded on 1149 of 5730 standardized boat-based shark cage diving trips, yielding 1351 sightings concentrated at a single shallow inshore site. A negative binomial generalized additive model identified Sea Surface Temperature, depth, season, and time as significant predictors of occurrence, with sightings increasing above 15°C, peaking at 6–9 m depth, and displaying a bimodal seasonal pattern inconsistent with austral summer mating aggregations documented elsewhere in the species' range. Sightings increased markedly after 2017, coinciding with documented white shark displacement from the area. Photo-identification of dorsal spot patterns catalogued eleven individuals across 405 positive identifications, with residency spanning from single visits to near-decade repeated associations. An open population mark-recapture model estimated high apparent survival (0.95), moderate detection probability (0.76), and a super-population of eleven individuals with low annual recruitment. These results support the presence of a small, predominantly female, partially resident assemblage exhibiting long-term site fidelity embedded within a broader regional population. This study represents the first population-level assessment of short-tail stingrays in South Africa and the longest continuous observational record of the species globally, demonstrating that shark cage diving operations can serve as cost-effective passive monitoring platforms for coastal elasmobranchs and validating photo-identification as a viable mark-recapture framework for batoids with naturally stable pigmentation patterns.
 
 ## Introduction 
 
@@ -141,20 +138,24 @@ This study represents the first population-level assessment of short-tail stingr
 The short-tail stingray (*Bathythosia brevicaudata*), also known as the smooth stingray, is a demersal and epi-pelagic batoid distributed anti-tropically across South Africa, Australia, New Zealand, and Japan [@last2016rays]. 
 The species can reach a maximum size of 210 cm disc width [@last2016rays] and is known to inhabit depths ranging from 0 to 200 meters [@le2008observations]. 
 The species exhibits aplacental viviparous reproduction, producing litters of 6–10 pups, with size-at-birth ranging from 32 to 36 cm disc width [@last2016rays]. 
-Seasonal aggregations, likely associated with mating and pupping, have been observed in the Poor Knights Islands Marine Reserve, New Zealand [@le2012conservation]. As well as pupping and mating aggregations, aggregations within harbours, a possible association to provisioning of fish discards from local fishermen, have been identified in Jervis Bay, Australia [@pini2018effects].
+Seasonal aggregations, likely associated with mating and pupping, have been observed in the Poor Knights Islands Marine Reserve, New Zealand [@le2012conservation]. As well as aggregations for pupping and mating, aggregations within harbours have been identified in Jervis Bay, Australia, a possible association to provisioning of fish discards from local fishermen [@pini2018effects].
 
 In South Africa, Struisbaai, located in the Western Cape province near Cape Agulhas, offers an example of a provisioned aggregation site, while increased regular sightings at Miller's Point, Simon's Town, Cape Town, Western Cape province, provides anecdotal evidence for another aggregation site. These aggregation sites are known locally, and limited to no records are documented for these aggregation sites in the scientific literature. Historically recorded sightings in Gansbaai, Western Cape province, suggest the area is an aggregation site for short-tail stingrays as well. 
 
 Along the African coast, the short-tail stingray is found from St. Helena Bay along the west coast of South Africa [@van2016extension], to southern Mozambique [@IUCN2021]. 
 While its generation length is not listed, its congener *B. lata* is listed as 21.5 years [@IUCN2021]. 
 The species was reclassified from *Dasyatis*, and the genus name *Bathythosia* resurrected, based on re-analysis of mitochondrial DNA [@last2016revised]. 
-Analyses of the mitochondrial DNA revealed limited gene flow in the Southern Hemisphere between South Africa and elsewhere and low levels of gene flow between Australia and New Zealand [@le2012population; @roycroft2019population]. The South African short-tail stingray population likely diverged from New Zealand between 112 000 and 225 000 years ago and from the Australian population between 75 000 and 150 000 years ago, respectively [@le2012population]. Furthermore, male-mediated gene flow has been shown to be at least fivefold greater than female-mediated gene flow [@roycroft2019population]. 
+Analyses of the mitochondrial DNA revealed limited gene flow in the Southern Hemisphere between South Africa and elsewhere and low levels of gene flow between Australia and New Zealand [@le2012population; @roycroft2019population]. The South African short-tail stingray population likely diverged from New Zealand between 112 000 and 225 000 years ago and from the Australian population between 75 000 and 150 000 years ago, respectively [@le2012population]. Male-mediated gene flow has been shown to be at least fivefold greater than female-mediated gene flow [@roycroft2019population]. 
 
-Large, coastal elasmobranch species are at the greatest risk of local extirpation or extinction, and suffer significantly from the combined threats of fishing and habitat degradation [@dulvy2014extinction; @dulvy2017challenges; @roycroft2019population]. Despite being classified as Least Concern on the IUCN Red List [@IUCN2021], the short-tail stingray is not without threat within South Africa, occasionally caught in recreational fisheries, and suspected to be caught (but not reported) in demersal shark longline, commercial, beach-seine and gillnet, and offshore and inshore demersal trawl fisheries [@da2015current]. As well as commercial bycatch, short-tail stingrays are targeted by recreational angling practices within South Africa, a catch and release practice that induces either mortality, injury or biochemical stress responses within elasmobranchs [@cameron2023review].
+In South Africa, Struisbaai is located in the Western Cape province near Cape Agulhas and offers an example of a provisioned aggregation site, while increased regular sightings at Miller’s Point, Simon’s Town, Cape Town, Western Cape province provides anecdotal evidence for another aggregation site. These aggregation sites are known locally, and limited to no records are documented for these aggregation sites in the scientific literature. Historically recorded sightings in Gansbaai, Western Cape province, suggest the area is an aggregation site for short-tail stingrays as well.
 
-Ecological knowledge surrounding the short-tail stingray is still severely lacking, none more so than in southern Africa, where the majority of what is known of the species' life history and ecology is derived from alternative global aggregations [@le2012conservation;@pini2018effects]. Existing monitoring methods include documentation through Baited Remote Underwater Video surveys (BRUVs) [@de2015baited; @osgood2020chondrichthyans; @dando2020baited; @cortelezzi2022conservation], as well as the Oceanographic Research Institute's Cooperative Fish Tagging Project (ORI-CFTP). This long-term marine citizen science project started in 1985 [@dunlop2013review; @mann2022assessment], yet only a 2.7% recapture rate of 184 tagged individuals have been documented over a 40 year period [@elston2025]. While the species is not a target species within the tagging programme, despite historical efforts, the data offers limited insight into short-tail stingray site use or migratory trends, indicating a requirement for more effective and frequent mark-recapture application. The application of photographic identification at aggregation sites is a plausible alternate method, successfully used in to collect life history and ecological data [@rowat2009population].
+Large, coastal elasmobranch species are at the greatest risk of local extirpation or extinction, and suffer significantly from the combined threats of fishing and habitat degradation [@dulvy2014extinction; @dulvy2017challenges; @roycroft2019population]. Despite being classified as Least Concern on the IUCN Red List [@IUCN2021], the short-tail stingray is not without threat within South Africa, occasionally caught in recreational fisheries, and suspected to be caught (but not reported) in demersal shark longline, commercial linefisheries, beach-seine and gillnet, and offshore and inshore demersal trawl fisheries [@da2015current]. As well as commercial bycatch, short-tail stingrays are targeted by recreational angling practices within South Africa, a catch and release practice that induces either mortality, injury or biochemical stress responses within elasmobranchs [@cameron2023review].
 
-The aim of this study was twofold: 
+Ecological knowledge surrounding the short-tail stingray is still severely lacking in southern Africa, where the majority of what is known of the species’ life history and ecology is derived from alternative global aggregations [@le2012conservation;@pini2018effects]. Existing monitoring methods include documentation through Baited Remote Underwater Video surveys (BRUVs) [@de2015baited; @osgood2020chondrichthyans; @dando2020baited; @cortelezzi2022conservation], as well as the Oceanographic Research Institute's Cooperative Fish Tagging Project (ORI-CFTP). This long-term marine citizen science project started in 1985 [@dunlop2013review; @mann2022assessment], yet only a 2.7% recapture rate of 184 tagged individuals have been documented over a 40 year period [@elston2025]. While the species is not a target species within the tagging programme, despite historical efforts, the data offers limited insight into short-tail stingray site use or migratory trends, indicating a requirement for more effective and frequent mark-recapture application. The application of photographic identification at aggregation sites is a plausible alternate method for collecting life history ecological data [@rowat2009population].
+
+Photographic identification which relies on unique natural pigmentation patterns, scars, or other distinct features, has emerged as a vital, relatively inexpensive, and non-invasive method for studying batoids and other elasmobranchs [@brooks2010seeing; @marshall2012use; @flowers2017site]. Photographic identification has shown to offer a valid alternative to conventional tagging, as long as its assumptions and practical constraints are met, and in some cases improving the results of mark–recapture studies [@rowat2009population; @marshall2012use]. Initial photographic identification studies on stingrays began in the Bahamas with species possessing intricate dorsal markings, such as the whitespotted eagle ray (*Aetobatus narinari*), establishing essential photographic requirements [@corcoran1999use]. Photographic identification has been successfully validated for rays, such as the blue-spotted ribbontail ray (*Taeniura lymma*) or smalleye stingray (*Megatrygon microps*), demonstrating stability of dorsal spot patterns over periods of at least 496 days [@boggio2019spotting] to six years [@mcivor2024mark], respectively, and enabling population assessment where conventional tagging is difficult [@keeping2020computer]. 
+
+There were two aims: 
 (1) to characterise the temporal and seasonal occurrence patterns of short-tail stingrays at a baited surface aggregation site in Gansbaai, South Africa, and evaluate the influence of abiotic parameters on sighting frequency; and 
 (2) apply photographic identification techniques to a historical image archive to catalog individually recognizable short-tail stingrays, assess site fidelity and residency patterns, and generate preliminary estimates of local abundance using mark-recapture frameworks.
 
@@ -163,31 +164,31 @@ The aim of this study was twofold:
 
 This study was performed at an inshore shark-cage diving site near Gansbaai, Western Cape, South Africa (19°26'E, -34°39'S; @fig-map), known as Joubertsdam. This area is located approximately 120 km south-east from Cape Town, and is influenced by both the cold Benguela and warm Agulhas Currents [@veitch2017role]. The benthic habitat is primarily sand and small boulders, with several sandstone banks and temperate reefs [@lenhoff1995marine]. This area is known for its high marine biodiversity, including 
 white sharks (prior to 2017; @towner2013environmental; @towner2016sex; @towner2022fear), 
-cetaceans [@petersen2016distribution], 
+cetaceans [@petersen2016distribution], and
 sunfish [@watson2023patterns], 
 while Dyer Island is home to various seabirds, including the Critically Endangered African penguin [@ludynia2014processes; @IUCN_peng], 
 and its neighbouring island Geyser Rock is home to a colony of Cape fur seals [@makhado2013assessment; @wcisel2015role]. 
 
-Data was collected during routine shark cage diving operations, following national permit condition regulations. After the shark cage diving vessel (SCDV) anchored, chum with fish-based products mixed with seawater were used until elasmobranchs were observed, typically operating between 07:00 and 16:00, with a maximum of three trips per day, each up to three hours in length. Location, depth and sea surface temperature (SST) data were collected on-site from the vessel's computer. 
+Data were collected during routine shark cage diving operations, following national permit condition regulations. After the shark cage diving vessel (SCDV) anchored, chum with fish-based products mixed with seawater was used, typically operating between 07:00 and 16:00, with a maximum of three trips per day, each up to three hours in length. Amongst the date, location, depth and sea surface temperature (SST) data were collected on-site from the vessel’s computer. While data were collected from SCDV operations at Dyer Island, these data were not included in this study due to the low number of short-tail stingray sightings in that area, and incomparable time frames of trips over the course of the study period.
 
-Two complementary methods were utilized for the purposes of this study: sightings records of short-tail stingrays, and individual identification of short-tail stingrays from in-field photographs.
+Two complementary methods were utilized for the purposes of this study: sightings records of short-tail stingrays, and individual identification of short-tail stingrays from in-field photographs. All analyses were performed in R (Version 4.2, R Core Team 2024). 
 
 ![Location of the study area with Joubertsdam (blue), in relation to Gansbaai and Kleinbaai. Inset: Location of Gansbaai within South Africa, with IUCN distribution in blue (@IUCN2021). ](Images/STSR_Loc_map_JDonly.pdf){#fig-map}
 
 
 ### Stingray Sightings
 
-Sightings data were collected over the period from January 2014 to December 2024. Sightings data was standardized per month by dividing the sum of short-tail stingray sightings per month by the number of trips performed that month. The short-tail stingray relative sightings data were analyzed using a generalized linear model (GLM) with Gaussian distribution and identity link function, and tested the effects of years (2014-2024) on the relative sightings. Data were log-transformed (log(relative sightings + 0.001)) to meet assumptions of normality and homoscedasticity. 
+Sightings data were collected over the period from January 2014 to December 2024. Sightings data were standardized per month by dividing the sum of short-tail stingray sightings per month by the number of trips performed that month. The short-tail stingray relative sightings data were analyzed using a generalized linear model (GLM) with Gaussian distribution and identity link function, and tested the effects of years (2014-2024) on the relative sightings. Data were log-transformed (log(relative sightings + 0.001)) to meet assumptions of normality and homoscedasticity. 
 Post-hoc pairwise comparisons were conducted using estimated marginal means with Tukey adjustment for multiple comparisons (`emmeans` package, @lenthandpiaskowski2025) and significance was assessed at $\alpha$=0.05.
 <!-- We plotted the long-term boat-based observations of [STSR] and compared monthly means of [STSR] numbers using analysis of variance (ANOVA) with a post hoc Tukey HSD test (Tukey 1949). -->
 
-A negative-binomial Generalized Additive Model (GAM), to account for overdispersion in the count data, was created using R's `gam`-function in the `mgcv` package [@wood2018mixed] on the sightings data, using SST, depth, day of the study period (as a number), and month as predictor variables (@eq-GAM). For SST, depth and day a thin plate spline was used, with the dimension of each smooth term (k) ranging from 10 to 15. The k-value was selected to balance model complexity with biological interpretability, and effective degrees of freedom were estimated using restricted maximum likelihood (REML). For month a cyclic cubic spline was used with k=12, accounting for the cyclic nature of the data and sampling across all twelve months. Model performance was evaluated using diagnostic plots including QQ-plots of residuals, residuals vs. linear predictor, histogram of residuals, and residuals vs. fitted values, using the `gam.check` function, and k compared to `k.check`'s k-value. 
+A negative-binomial Generalized Additive Model (GAM), to account for overdispersion in the count data, was created using R's `gam`-function in the `mgcv` package [@wood2018mixed] on the raw sightings data (STSR), using SST, depth, day of the study period (as a number, date), and month as predictor variables (@eq-GAM). For SST, depth and day a thin plate spline was used, with the dimension of each smooth term (k) ranging from 10 to 15. The k-value was selected to balance model complexity with biological interpretability, and effective degrees of freedom were estimated using restricted maximum likelihood (REML). For month a cyclic cubic spline was used with k=12, accounting for the cyclic nature of the data and sampling across all twelve months. Model performance was evaluated using diagnostic plots including QQ-plots of residuals, residuals vs. linear predictor, histogram of residuals, and residuals vs. fitted values, using the `gam.check` function, and k compared to `k.check`'s k-value. 
 
 $$
 \begin{aligned}
 \text{STSR} &\text{~} s(\text{SST}, bs="tp", k=15) \\
   &+ s(\text{Depth}, bs="tp", k=12) \\
-  &+ s(\text{Time}, bs="tp", k=10)  \\
+  &+ s(\text{Date}, bs="tp", k=10)  \\
   &+ s(\text{Month}, bs="cc", k=12) 
 \end{aligned}
 $$ {#eq-GAM}
@@ -195,9 +196,7 @@ $$ {#eq-GAM}
 
 ### Photographic Identification
 
-Photographic identification which relies on unique natural pigmentation patterns, scars, or other distinct features, has emerged as a vital, relatively inexpensive, and non-invasive method for studying batoids and other elasmobranchs [@brooks2010seeing; @marshall2012use; @flowers2017site]. Photographic identification has shown to offer a valid alternative to conventional tagging, as long as its assumptions and practical constraints are met, and in some cases improving the results of mark–recapture studies [@rowat2009population; @marshall2012use]. Initial photographic identification studies on stingrays began in the Bahamas with species possessing intricate dorsal markings, such as the whitespotted eagle ray (*Aetobatus narinari*), establishing essential photographic requirements [@corcoran1999use]. Photographic identification has been successfully validated for rays, such as the blue-spotted ribbontail ray (*Taeniura lymma*) or smalleye stingray (*Megatrygon microps*), demonstrating stability of dorsal spot patterns over periods of at least 496 days [@boggio2019spotting] to six years [@mcivor2024mark], respectively, and enabling population assessment where conventional tagging is difficult [@keeping2020computer]. 
-
-During routine operations, photos of wildlife were taken from the SCDV. These included short-tail stingrays as they approached the vessel. Spot patterns were identified on the dorsal side of the body, behind the spiracles (@fig-SpotComp). These spots varied in number and composition, and appeared to be individual-specific. The relative sighting for each individual was calculated by dividing the number of observations per month by the number of days within that month, and then averaged over all months of the study period. Photos of individuals captured at the start and end of the study period were compared to determine whether there were any significant changes in number of spots and composition. An abacus plot of sightings across the time period and across months were created to visually examine individual patterns in sightings. An accumulation curve was constructed using R's `specaccumm`-function in the `vegan` package to determine whether survey effort adequately captured the observable population, whether identification effort approached asymptotic population coverage, and to provide complementary context for interpretation of population estimates.
+During routine operations, opportunistic photos of short-tail stingrays were taken from the SCDV. Poor quality photos and photos with fully submerged individuals were excluded. Spot patterns were manually identified on the dorsal side of the body, behind the spiracles (@fig-SpotComp). These spots varied in number and composition, and appeared to be individual-specific. The relative sighting for each individual was calculated by dividing the number of observations per month by the number of days within that month, and then averaged over all months of the study period. Photos of individuals captured at the start and end of the study period were manually compared to determine whether there were any significant changes in number of spots and composition. An abacus plot of sightings across the time period and across months were created to visually examine individual patterns in sightings. An accumulation curve was constructed using R's `specaccumm`-function in the `vegan` package to determine whether survey effort adequately captured the observable population, whether identification effort approached asymptotic population coverage, and to provide complementary context for interpretation of population estimates.
 <!-- , while Chao and Bootstrap extrapolation were calculated to [estimate the total observable population size - FIX SENTENCE] using the `specpool`-function from the same package.  -->
 
 
@@ -262,8 +261,8 @@ Between January 2014 and December 2024, a total of `r n_trips` trips to Jouberts
 (`r round(trip_sumSum[trip_sumSum$Month == 6, "Date.mn"],1)` ± `r round(trip_sumSum[trip_sumSum$Month == 6, "Date.sd"],1)` and 
 `r round(trip_sumSum[trip_sumSum$Month == 7, "Date.mn"],1)` ± `r round(trip_sumSum[trip_sumSum$Month == 7, "Date.sd"],1)` trips/month, mean±sd, respectively), while October, November and December showed on average the highest number of trips (`r round(trip_sumSum[trip_sumSum$Month == 10, "Date.mn"],1)` ± `r round(trip_sumSum[trip_sumSum$Month == 10, "Date.sd"],1)`, 
 `r round(trip_sumSum[trip_sumSum$Month == 11, "Date.mn"],1)` ± `r round(trip_sumSum[trip_sumSum$Month == 11, "Date.sd"],1)` and 
-`r round(trip_sumSum[trip_sumSum$Month == 12, "Date.mn"],1)` ± `r round(trip_sumSum[trip_sumSum$Month == 12, "Date.sd"],1)` trips/month, respectively; @tbl-trp_summ).
-Depth ranged from `r min_depth` m to `r max_depth` m, `r mn_depth` ± `r sd_depth` m (mean ± sd), while SST ranged from `r min_SST`°C to `r max_SST`°C (`r mn_SST`±`r sd_SST`°C). 
+`r round(trip_sumSum[trip_sumSum$Month == 12, "Date.mn"],1)` ± `r round(trip_sumSum[trip_sumSum$Month == 12, "Date.sd"],1)` trips/month, mean ± sd, respectively; See Supplementary Materials Table 1).
+Depth ranged from `r min_depth` m to `r max_depth` m (`r mn_depth` ± `r sd_depth` m, mean ± sd), while SST ranged from `r min_SST`°C to `r max_SST`°C (`r mn_SST`±`r sd_SST`°C). 
 
 
 ```{r STSR_SST}
@@ -398,9 +397,9 @@ STSR_lm <- summary(lm(STSR ~ Date, STSR_lm_prep))
 
 Out of `r n_trips` trips performed, short-tail stingrays were sighted on `r n_trip_wSTSR` trips (`r round((n_trip_wSTSR/n_trips)*100,2)`%). The number of short-tail stingrays sighted on these trips ranged from 1 to 3 (`r round(mean(filter(STSR_lm_prep, STSR >=1)$STSR),2)` ± `r round(sd(filter(STSR_lm_prep, STSR >=1)$STSR),2)`, mean ± sd), resulting in a total of `r n_STSR` short-tail stingray sightings. Due to a drop in trips as a result of the national COVID-19 lockdown and the resulting impact on tourism, there was a decrease in sightings of short-tail stingrays around 2020 and 2021.
 
-The location of Dyer Island was not considered in the analyses of this study due to the low number of sightings of stingrays in the area (n = `r n_STSR_DI`), and incomparable time frames of trips over the course of the study --- primarily between 2014 and 2016 (n = 105, n = 120, n = 151, respectively), lower than average number of trips to Dyer Island in 2017, 2018, 2021 and 2022 (n = 20, n = 9, n = 8, n = 1, respectively), with no trips in 2019, 2020, 2023 and 2024. 
+The location of Dyer Island was not considered in the analyses of this study due to the low number of sightings of stingrays in the area (n = `r n_STSR_DI`), and incomparable time frames of trips over the course of the study.
 
-```{r}
+```{r, fig.show='hide'}
 #| label: tbl-trp_summ
 #| tbl-cap: "Count of number of ecotourism trips to Joubertsdam between 2014 and 2024, per month, with yearly and monthly totals."
 
@@ -583,7 +582,7 @@ The subsequent Tukey-HSD post-hoc testing revealed two distinct groupings in mea
 
 ```{r  echo=FALSE}
 #| label: fig-STSR_box
-#| fig-cap: "Short-tail stingray (Bathytoshia brevicaudata) sightings per trip per month (box-and-whisker) around shark cage diving vessels (SCDV), and trips per month (dashed line and errorbars) in Gansbaai, South Africa, between 2014 and 2024."
+#| fig-cap: "Short-tail stingray (Bathytoshia brevicaudata) monthly relative sightings (box-and-whisker) around shark cage diving vessels (SCDV), and trips per month (dashed line and sd-errorbars) in Gansbaai, South Africa, between 2014 and 2024."
 #| fig-height: 6
 #| fig-width: 10
 
@@ -682,7 +681,7 @@ STSR_gam_sum <- summary(STSR_gam)
 ```
 
 
-All examined smooth terms were statistically significant predictors of short-tail stingray sightings: SST ($\chi^2$ = `r round(STSR_gam_sum$s.table[1,3],2)`, p<0.05), depth ($\chi^2$ = `r round(STSR_gam_sum$s.table[2,3],2)`, p<0.05), across time ($\chi^2$ = `r round(STSR_gam_sum$s.table[3,3],2)`, p < 0.05) and month ($\chi^2$ = `r round(STSR_gam_sum$s.table[4,3],2)`, p < 0.05; @tbl-gam_table). The smooth function for SST showed a nonlinear response, with sighting probability increasing above 15°C (@fig-gam_plots A). The depth smooth term exhibited a peak response between 6-9 meters, followed by increasing uncertainty (widening 2-standard error) beyond 10 meters depth due to the low number of trips at deeper depths (@fig-gam_plots B). The temporal smooth function indicated an increasing trend in sightings after 2017 (@fig-gam_plots C). The seasonal smooth term revealed a bimodal pattern across months, with elevated sightings during March-July and a secondary peak in August-September (@fig-gam_plots D).
+All examined smooth terms were statistically significant predictors of short-tail stingray sightings: SST ($\chi^2$ = `r round(STSR_gam_sum$s.table[1,3],2)`, p<0.05), depth ($\chi^2$ = `r round(STSR_gam_sum$s.table[2,3],2)`, p<0.05), date ($\chi^2$ = `r round(STSR_gam_sum$s.table[3,3],2)`, p < 0.05) and month ($\chi^2$ = `r round(STSR_gam_sum$s.table[4,3],2)`, p < 0.05; @tbl-gam_table). The smooth function for SST showed a nonlinear response, with sighting probability increasing above 15°C (@fig-gam_plots A). The depth smooth term exhibited a peak response between 6-9 meters, followed by increasing uncertainty (widening 2-standard error) beyond 10 meters depth due to the low number of trips at deeper depths (@fig-gam_plots B). The temporal smooth function indicated an increasing trend in sightings after 2017 (@fig-gam_plots C). The seasonal smooth term revealed a bimodal pattern across months, with elevated sightings during March-July and a secondary peak in August-September (@fig-gam_plots D).
 
 
 
@@ -783,7 +782,7 @@ STSR_gam_ggplot_mon <- ggplot(STSR_gam_plot_month_df, aes(x=x, y = fit )) +
 
 ```{r } 
 #| label: fig-gam_plots
-#| fig-cap: "Partial effects plots from the GAM model showing smooth functions for short-tail stingray sightings. (A) Response to Sea-Surface Temperature (SST), (B) response to depth, (C) temporal trend between 2014 and 2024, (D) and seasonal pattern. Solid lines represent the fitted smooth functions, shaded areas indicate two standard errors."
+#| fig-cap: "Partial effects plots from the GAM model showing smooth functions for short-tail stingray sightings, with variable and estimated degrees of freedom on the y-axis. (A) Response to Sea-Surface Temperature (SST), (B) response to depth, (C) temporal trend between 2014 and 2024, (D) and seasonal pattern. Solid lines represent the fitted smooth functions, shaded areas indicate two standard errors."
 
 ggarrange(STSR_gam_ggplot_SST, STSR_gam_ggplot_dep, 
           STSR_gam_ggplot_time, STSR_gam_ggplot_mon, 
@@ -850,7 +849,7 @@ STSR_summ_tbl <- STSR_summ_tbl %>%
 ```
 
 
-Between 2014 and 2024 eleven short-tail stingrays were identified across `r STSR_ID_data %>% drop_na(STSR_ID) %>% nrow()` positive sightings. These ranged from a single sighting for individual STSR005 (Relative Sighting = 0.0003), to 156 sightings for individual STSR002 (Relative Sighting = 0.0389; @tbl-ID_summary; across study period: @fig-ID_sighting A, across months: @fig-ID_sighting B). The average period between first and last sighting was `r round(mean(STSR_summ_tbl$Duration)[[1]],1)` days (± `r round(sd(STSR_summ_tbl$Duration)[[1]],1)` days, ± sd). 
+Between December 2014 and December 2024 eleven short-tail stingrays were identified across `r STSR_ID_data %>% drop_na(STSR_ID) %>% nrow()` positive sightings (30.0% of short-tail stingray sightings). These ranged from a single sighting for individual STSR005 (Relative Sighting = 0.0003), to 156 sightings for individual STSR002 (Relative Sighting = 0.0389; @tbl-ID_summary; across study period: @fig-ID_sighting A, across months: @fig-ID_sighting B). The average period between first and last sighting was `r round(mean(STSR_summ_tbl$Duration)[[1]],1)` days (± `r round(sd(STSR_summ_tbl$Duration)[[1]],1)` days, ± sd). Sightings of short-tail stingray individuals across months was consistent with the same bimodal pattern as seen with the GAM model output of sightings data (Figure 4D; Figure 5B) 
 There was a consistent increase in identification of short-tail stingrays across the time period (@fig-ID_sighting C), with an average increase of one new individual sighted every 238 days. There was a sharp increase in new positive identifications in late 2017, which correlated with the overall increase in sightings of short-tail stingray during this period (@fig-STSR_box, @fig-gam_plots C), and identified individual showed the same dip in detections between 2020 and 2021 as the sightings as a result of the impact on tourism due to the national COVID-19 lockdown. 
 Sightings of short-tail stingray individuals across months was consistent with the same bimodal pattern as seen with the GAM model output of sightings data (@fig-gam_plots D; @fig-ID_sighting B). 
 <!--Short-tail stingray individuals were primarily seen on days with warmer SST each month, including during the austral winter months (@fig-ID_sighting D). While variation in SST was higher during the austral summer months, and lower during the austral winter months, the SST on days when short-tail stingray individuals were sighted deviated from the overall mean SST during the former months and matched closer with the latter. -->
@@ -1130,7 +1129,7 @@ kable(ID_tbl_seas)
 
 STSR_ID_cumm <- dcast(as.data.table(STSR_ID_data),  Month + Year ~ STSR_ID, length, value.var="STSR_ID")
 STSR_ID_cumm <- STSR_ID_cumm %>%
-  select(-`NA`) %>%
+  #select(-`NA`) %>%
   rowwise() %>%
   mutate(nonzero_stsr_count = sum(c_across(contains("STSR")) != 0, na.rm = TRUE)) %>%
   ungroup() %>%
@@ -1225,16 +1224,18 @@ p1
 
 ```{r}
 
-POPAN_summTbl <- read_csv("Manuscript_Figures/POPAN_summary_table.csv")
+POPAN_file <- dir("~/Documents/GitHub", "POPAN_summary_table.csv", recursive = T, full.names = T)
+POPAN_summTbl <- read_csv(POPAN_file)
 
 POPAN_summTbl$weight <- round(POPAN_summTbl$weight,4)
 POPAN_summTbl$rank <- seq(1,8,by=1)
 
-CJS_EstAbund <- read_csv("Manuscript_Figures/CJS_EstimatedAbundance.csv")
+CJS_EstAbund_file <- dir("~/Documents/GitHub", "CJS_EstimatedAbundance.csv", recursive = T, full.names = T)
+CJS_EstAbund <- read_csv(CJS_EstAbund_file)
 colnames(CJS_EstAbund)[3:4] <- c("perc25", "perc975")
 
-CJS_ResTbl <- read_csv("Manuscript_Figures/CJS_Result_tbl.csv")
-
+CJS_ResTbl_file <- dir("~/Documents/GitHub", "CJS_Result_tbl.csv", recursive = T, full.names = T)
+CJS_ResTbl <- read_csv(CJS_ResTbl_file)
 
 
 ```
@@ -1286,7 +1287,7 @@ POPAN_plot <- ggplot(CJS_EstAbund, aes(x=Year, y=estim_abundance)) +
   scale_x_continuous(breaks=seq(2015,2024,by=1)) + 
   labs( y = "Estimated population size\n(and 97.5% confidence interval)") + 
   coord_cartesian(ylim=c(-1,15)) + 
-  theme(panel.grid.major.y = element_line(linewidth = 1))
+  theme(panel.grid.major.y = element_line(linewidth = 0.25))
 
 POPAN_plot
 
